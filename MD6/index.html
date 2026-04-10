@@ -112,9 +112,9 @@
       </div>
     </div>
     
-    <!-- Sandbox -->
+    <!-- Sandbox: allow-same-originを追加してlocalStorageを使えるようにした -->
     <div class="flex-1 w-full bg-white relative">
-      <iframe id="runner-iframe" class="absolute inset-0 w-full h-full border-none" sandbox="allow-scripts allow-forms allow-modals allow-downloads"></iframe>
+      <iframe id="runner-iframe" class="absolute inset-0 w-full h-full border-none" sandbox="allow-scripts allow-forms allow-modals allow-downloads allow-same-origin"></iframe>
     </div>
   </div>
 
@@ -267,6 +267,7 @@
     let currentImageUrl = '';
     let importPendingData = null;
     let confirmCallback = null;
+    let currentRunningAppId = null; // 現在実行中のアプリID
 
     // --- DOM要素 ---
     const gridContainer = document.getElementById('app-grid');
@@ -304,14 +305,26 @@
         sortOption = savedSort;
         sortSelect.value = sortOption;
       }
-      
+
       renderGrid();
       lucide.createIcons();
+
+      // リロード時に直前のアプリを開き直す
+      const lastAppId = localStorage.getItem('webapp_hub_last_running_id');
+      if (lastAppId) {
+        const app = apps.find(a => a.id === lastAppId);
+        if (app) runApp(app);
+      }
     }
 
     function saveData() {
       localStorage.setItem('webapp_hub_data', JSON.stringify(apps));
       localStorage.setItem('webapp_hub_sort', sortOption);
+      if (currentRunningAppId) {
+        localStorage.setItem('webapp_hub_last_running_id', currentRunningAppId);
+      } else {
+        localStorage.removeItem('webapp_hub_last_running_id');
+      }
     }
 
     // --- レンダリング ---
@@ -551,27 +564,78 @@
     const runnerTitle = document.getElementById('runner-title');
     let currentRunningApp = null; // 現在実行中のアプリを保持
 
+    /**
+     * アプリごとにlocalStorageを分離するためのシム（Shim）を注入する
+     * ツールAとツールBで同じキー名で保存しても衝突しないようにする
+     */
+    function injectStorageShim(appId, html) {
+      const shim = `
+        <script>
+        (function() {
+          const appId = "${appId}";
+          const prefix = "webapp_scoped_" + appId + "_";
+          const originalLS = window.localStorage;
+          
+          // localStorageのメソッドをラップしてアプリごとのプレフィックスを自動付与する
+          const scopedLS = {
+            getItem: (key) => originalLS.getItem(prefix + key),
+            setItem: (key, val) => originalLS.setItem(prefix + key, val),
+            removeItem: (key) => originalLS.removeItem(prefix + key),
+            clear: () => {
+              const keys = Object.keys(originalLS);
+              keys.forEach(k => {
+                if (k.startsWith(prefix)) originalLS.removeItem(k);
+              });
+            },
+            key: (i) => {
+              const keys = Object.keys(originalLS).filter(k => k.startsWith(prefix));
+              return keys[i] ? keys[i].replace(prefix, '') : null;
+            },
+            get length() {
+              return Object.keys(originalLS).filter(k => k.startsWith(prefix)).length;
+            }
+          };
+
+          // window.localStorageをこのスコープ付きオブジェクトに差し替える
+          Object.defineProperty(window, 'localStorage', {
+            get: () => scopedLS,
+            configurable: true
+          });
+        })();
+        <\/script>
+      `;
+      
+      // HTMLの先頭にシムを挿入
+      return shim + html;
+    }
+
     function runApp(app) {
       currentRunningApp = app;
+      currentRunningAppId = app.id;
       runnerTitle.textContent = app.name;
-      runnerIframe.srcdoc = app.html;
+      
+      // ストレージシムを適用したHTMLを実行
+      runnerIframe.srcdoc = injectStorageShim(app.id, app.html);
+      
       runnerView.classList.remove('hidden');
       runnerView.classList.add('flex');
+      saveData(); // 実行中のIDを記憶
     }
 
     function closeApp() {
       currentRunningApp = null;
+      currentRunningAppId = null;
       runnerView.classList.add('hidden');
       runnerView.classList.remove('flex');
       runnerIframe.srcdoc = ''; // メモリ解放
+      saveData();
     }
 
     function reloadApp() {
       if (currentRunningApp) {
-        // 一時的にsrcdocを空にして再描画を強制する
         runnerIframe.srcdoc = '';
         setTimeout(() => {
-          runnerIframe.srcdoc = currentRunningApp.html;
+          runnerIframe.srcdoc = injectStorageShim(currentRunningApp.id, currentRunningApp.html);
         }, 50);
       }
     }
