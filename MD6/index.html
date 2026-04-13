@@ -644,11 +644,41 @@
 
     // ドラッグ＆ドロップ
     const dropOverlay = document.getElementById('drop-overlay');
-    window.ondragenter = (e) => { if (e.dataTransfer.types.includes('Files')) dropOverlay.classList.remove('hidden'); };
-    dropOverlay.ondragleave = () => dropOverlay.classList.add('hidden');
-    window.ondragover = (e) => e.preventDefault();
-    window.ondrop = (e) => {
-      e.preventDefault(); dropOverlay.classList.add('hidden');
+    let dragCounter = 0;
+
+    window.addEventListener('dragenter', (e) => {
+      // アプリ実行中（ホーム以外のタブが開いている時）は反応させない
+      if (activeTabId !== 'home') return; 
+      e.preventDefault();
+      if (e.dataTransfer.types.includes('Files')) {
+        dragCounter++;
+        dropOverlay.classList.remove('hidden');
+        dropOverlay.classList.add('flex');
+      }
+    });
+
+    window.addEventListener('dragover', (e) => {
+      if (activeTabId !== 'home') return;
+      e.preventDefault();
+    });
+
+    window.addEventListener('dragleave', (e) => {
+      if (activeTabId !== 'home') return;
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        dropOverlay.classList.add('hidden');
+        dropOverlay.classList.remove('flex');
+      }
+    });
+
+    window.addEventListener('drop', (e) => {
+      if (activeTabId !== 'home') return;
+      e.preventDefault();
+      dragCounter = 0;
+      dropOverlay.classList.add('hidden');
+      dropOverlay.classList.remove('flex');
+      
       Array.from(e.dataTransfer.files).forEach(file => {
         if (file.name.endsWith('.html')) {
           const reader = new FileReader();
@@ -659,7 +689,7 @@
           reader.readAsText(file);
         }
       });
-    };
+    });
 
     // インポート・エクスポート
     document.getElementById('btn-export').onclick = () => {
