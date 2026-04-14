@@ -1,177 +1,918 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced React to HTML Converter</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Fira+Code&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .code-font { font-family: 'Fira Code', monospace; }
-        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 700; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .glass-panel { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
-    </style>
-</head>
-<body class="bg-slate-100 min-h-screen flex flex-col text-slate-900">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebApp Hub</title>
+  
+  <!-- PWA & App Icons -->
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/x-icon" href="./favicon.ico">
+  <link rel="apple-touch-icon" href="./favicon.ico">
+  <link rel="manifest" href="./manifest.json">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Header -->
-    <header class="bg-white/70 backdrop-blur-md border-b sticky top-0 z-50 px-8 py-3 flex justify-between items-center shadow-sm">
-        <div class="flex items-center gap-4">
-            <div class="bg-blue-600 p-2.5 rounded-2xl shadow-lg shadow-blue-200">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+  <style>
+    /* アニメーション */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .animate-fade-in { animation: fadeIn 0.15s ease-out forwards; }
+    .animate-zoom-in { animation: zoomIn 0.2s ease-out forwards; }
+    
+    /* スクロールバー */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* アクティブなタブ */
+    .tab-active {
+      background-color: #f1f5f9;
+      color: #4f46e5;
+      border-bottom: 2px solid #4f46e5;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* ロゴのホバー効果 */
+    .logo-container:hover .logo-icon {
+      transform: scale(1.1);
+      background-color: #e0e7ff;
+    }
+  </style>
+</head>
+<body class="bg-slate-100/50 text-slate-800 font-sans selection:bg-indigo-100 min-h-screen flex flex-col overflow-hidden">
+
+  <!-- ====================
+       ヘッダーとタブバー
+  ==================== -->
+  <header class="bg-white border-b border-slate-200 z-50 shadow-sm shrink-0">
+    <div class="max-w-[1800px] mx-auto flex items-center h-14 px-4 gap-4">
+      <!-- ロゴ (ホームボタンとして機能) -->
+      <div id="logo-home" class="flex items-center gap-2 text-indigo-600 shrink-0 mr-2 cursor-pointer logo-container group transition-all" onclick="switchTab('home')">
+        <div class="bg-indigo-100 p-1.5 rounded-lg logo-icon transition-transform duration-200">
+          <i data-lucide="box" class="w-5 h-5" stroke-width="2.5"></i>
+        </div>
+        <h1 class="text-lg font-bold tracking-tight hidden lg:block group-hover:text-indigo-700 transition-colors">WebApp Hub</h1>
+      </div>
+
+      <!-- タブコンテナ -->
+      <nav id="tab-container" class="flex-1 flex items-center h-full overflow-x-auto no-scrollbar gap-1">
+        <!-- JSでタブが挿入されます -->
+      </nav>
+
+      <!-- 右側アクション -->
+      <div id="global-actions" class="flex items-center gap-1 shrink-0 border-l border-slate-200 pl-4">
+        <div id="runner-tools" class="hidden flex items-center gap-1">
+          <button id="btn-reload-runner" class="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors" title="再読み込み (F5)">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+          </button>
+        </div>
+        
+        <div id="home-tools" class="flex items-center gap-2">
+          <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2">
+            <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-slate-400 mr-1"></i>
+            <select id="sort-select" class="bg-transparent text-xs text-slate-600 py-2 focus:outline-none cursor-pointer">
+              <option value="date-asc">登録日 (旧)</option>
+              <option value="date-desc">登録日 (新)</option>
+              <option value="name-asc">名前 (昇順)</option>
+              <option value="name-desc">名前 (降順)</option>
+            </select>
+          </div>
+          <button id="btn-import" class="p-2 hover:bg-slate-100 rounded-lg text-slate-500" title="インポート">
+            <i data-lucide="download" class="w-4 h-4"></i>
+          </button>
+          <button id="btn-export" class="p-2 hover:bg-slate-100 rounded-lg text-slate-500" title="エクスポート">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+          </button>
+          <input type="file" accept=".json" id="import-file-input" class="hidden" />
+        </div>
+
+        <!-- 設定ボタン -->
+        <button id="btn-settings" class="p-2 hover:bg-slate-100 rounded-lg text-slate-500 ml-1" title="設定">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====================
+       メインコンテンツエリア
+  ==================== -->
+  <main class="flex-1 relative overflow-hidden bg-slate-50/30">
+    
+    <!-- グリッド表示（ホーム） -->
+    <div id="main-view" class="absolute inset-0 overflow-y-auto p-6 md:p-10 z-10 transition-opacity duration-200">
+      <div class="max-w-[1600px] mx-auto">
+        <div id="app-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
+          <!-- アプリタイル -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 実行画面（Iframe管理） -->
+    <div id="runner-view" class="absolute inset-0 z-20 hidden flex-col bg-white">
+      <div id="iframe-manager" class="flex-1 w-full relative">
+        <!-- タブごとのiframe -->
+      </div>
+    </div>
+  </main>
+
+
+  <!-- ====================
+       モーダル群
+  ==================== -->
+  
+  <!-- エディタモーダル -->
+  <div id="editor-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] items-center justify-center p-4 hidden animate-fade-in">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-zoom-in">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-3">
+          <div class="bg-indigo-100 p-1.5 rounded-lg text-indigo-600">
+            <i data-lucide="code" class="w-5 h-5"></i>
+          </div>
+          <span id="editor-title">新規アプリを登録</span>
+        </h2>
+        <button id="btn-close-editor" class="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
+      </div>
+      <div class="p-6 flex-1 overflow-y-auto bg-slate-50 flex flex-col gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[400px]">
+          <!-- 左カラム: メタデータ -->
+          <div class="flex flex-col gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">アプリ名</label>
+              <input type="text" id="editor-name" placeholder="例: メモ帳" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all" />
             </div>
             <div>
-                <h1 class="text-xl font-black text-slate-800 tracking-tight">React FULL REPRODUCER</h1>
-                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Complex Logic & Lucide Support</p>
-            </div>
-        </div>
-        <div class="flex gap-3">
-            <button id="btnConvert" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 flex items-center gap-2">
-                <span>HTMLに変換・再現</span>
-            </button>
-            <button id="btnDownload" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg hidden flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span>保存</span>
-            </button>
-        </div>
-    </header>
-
-    <main class="flex-1 flex overflow-hidden">
-        <!-- Input Section -->
-        <div class="w-1/2 flex flex-col bg-white border-r relative">
-            <div class="px-6 py-2 bg-slate-50 border-b flex justify-between items-center shrink-0">
-                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Source Code (JSX)</span>
-                <button id="btnClear" class="text-[10px] font-bold text-slate-400 hover:text-red-500 transition uppercase">Clear All</button>
-            </div>
-            <textarea id="inputCode" class="flex-1 p-6 code-font text-[13px] outline-none resize-none leading-relaxed text-slate-700 scrollbar-hide" placeholder="// 複雑なインポートを含むReactコードをここに貼り付け..."></textarea>
-        </div>
-
-        <!-- Output/Preview Section -->
-        <div class="w-1/2 flex flex-col overflow-hidden bg-slate-50">
-            <div class="flex border-b bg-white shrink-0">
-                <button id="tabPreview" class="flex-1 py-4 text-xs font-black tracking-widest uppercase tab-active">Live Preview</button>
-                <button id="tabCode" class="flex-1 py-4 text-xs font-black tracking-widest uppercase text-slate-400 border-b-3 border-transparent">Generated HTML</button>
-            </div>
-
-            <!-- Preview Window -->
-            <div id="containerPreview" class="flex-1 p-6 overflow-hidden flex flex-col">
-                <div class="flex-1 bg-white border rounded-2xl shadow-2xl overflow-hidden relative">
-                    <iframe id="previewFrame" class="w-full h-full border-none"></iframe>
-                    <div id="loadingOverlay" class="absolute inset-0 bg-white/90 flex items-center justify-center hidden z-50">
-                        <div class="flex flex-col items-center gap-4">
-                            <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            <span class="text-sm font-black text-slate-800 tracking-widest uppercase">Analyzing & Building...</span>
-                        </div>
-                    </div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">アイコン画像</label>
+              <div class="flex gap-4 items-start">
+                <div id="editor-image-preview" class="w-20 h-20 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shadow-inner text-slate-300">
+                  <i data-lucide="image" class="w-8 h-8"></i>
                 </div>
-            </div>
-
-            <!-- HTML Code View -->
-            <div id="containerCode" class="flex-1 p-6 hidden flex flex-col bg-slate-900">
-                <div class="flex justify-between items-center mb-3">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Standalone index.html</span>
-                    <button id="btnCopy" class="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition uppercase">Copy to Clipboard</button>
+                <div class="flex-1 flex flex-col gap-2">
+                  <input type="text" id="editor-image-url" placeholder="URLを入力、または画像をコピペ..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                  <div class="flex items-center gap-2">
+                    <button id="btn-trigger-file" class="text-xs font-medium bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg">ファイル選択</button>
+                    <button id="btn-clear-image" class="text-xs font-medium text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg hidden">クリア</button>
+                    <input type="file" accept="image/*" id="editor-image-file" class="hidden" />
+                  </div>
                 </div>
-                <textarea id="outputHtml" readonly class="flex-1 p-6 code-font text-[12px] bg-slate-800 text-blue-200 rounded-2xl outline-none resize-none border border-slate-700 leading-normal scrollbar-hide"></textarea>
+              </div>
             </div>
+
+            <!-- バージョン履歴セクション (JSで制御) -->
+            <div id="editor-history-section" class="flex flex-col flex-1 hidden">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">バージョン履歴</label>
+              <div class="flex-1 bg-white border border-slate-300 rounded-xl overflow-y-auto max-h-[160px] p-2 shadow-inner">
+                <ul id="editor-history-list" class="flex flex-col gap-1">
+                  <!-- JSで生成 -->
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 右カラム: コードエディタ -->
+          <div class="flex-1 flex flex-col h-full min-h-[300px]">
+            <div class="flex justify-between items-end mb-2">
+              <label class="block text-sm font-semibold text-slate-700">ソースコード</label>
+              <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
+                  <button type="button" id="btn-copy-html" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="表示中のコードをコピー">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                  </button>
+                  <button type="button" id="btn-clear-code" class="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="すべてクリア">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <div class="w-px h-4 bg-slate-300 mx-1"></div>
+                <div class="flex bg-slate-200/80 rounded-lg p-1 gap-1">
+                  <button type="button" id="btn-type-html" class="px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all">HTML</button>
+                  <button type="button" id="btn-type-react" class="px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all">React (JSX)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- GitHubインポートUI -->
+            <div class="flex gap-2 mb-2 items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+              <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500">
+                  <i data-lucide="github" class="w-4 h-4"></i>
+                </div>
+                <input type="text" id="github-url-input" placeholder="GitHubのファイルURLをペースト..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-shadow" />
+              </div>
+              <button type="button" id="btn-fetch-github" class="px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors shrink-0 flex items-center gap-1 shadow-sm">
+                <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                取得
+              </button>
+            </div>
+
+            <textarea id="editor-html" class="w-full flex-1 font-mono text-sm px-4 py-4 bg-slate-900 text-slate-100 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none leading-relaxed shadow-inner transition-colors" spellcheck="false"></textarea>
+          </div>
         </div>
-    </main>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
+        <button id="btn-cancel-editor" class="px-6 py-2.5 text-slate-600 hover:bg-slate-100 border rounded-xl font-medium transition-colors">キャンセル</button>
+        <button id="btn-save-editor" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2">
+          <span id="save-editor-text">保存して登録</span>
+          <i id="save-editor-loader" data-lucide="loader-2" class="w-4 h-4 animate-spin hidden"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 
-    <!-- Global Toast -->
-    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-3xl bg-slate-900 text-white text-xs font-black shadow-2xl transition-all opacity-0 translate-y-10 pointer-events-none z-[100] tracking-widest uppercase"></div>
+  <!-- 設定モーダル -->
+  <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[130] items-center justify-center p-4 hidden animate-fade-in">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-zoom-in">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-3">
+          <i data-lucide="settings" class="w-5 h-5 text-slate-500"></i>
+          <span>設定</span>
+        </h2>
+        <button id="btn-close-settings" class="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
+      </div>
+      <div class="p-6 flex flex-col gap-6">
+        <!-- タブ表示モード -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-3">タブの表示モード</label>
+          <div class="flex bg-slate-100 p-1 rounded-xl">
+            <button id="tab-mode-full" class="flex-1 py-2 text-sm font-medium rounded-lg transition-all">名前とアイコン</button>
+            <button id="tab-mode-icon" class="flex-1 py-2 text-sm font-medium rounded-lg transition-all">アイコンのみ</button>
+          </div>
+        </div>
 
-    <script>
-        const inputCode = document.getElementById('inputCode');
-        const outputHtml = document.getElementById('outputHtml');
-        const previewFrame = document.getElementById('previewFrame');
-        const btnConvert = document.getElementById('btnConvert');
-        const btnDownload = document.getElementById('btnDownload');
-        const btnCopy = document.getElementById('btnCopy');
-        const btnClear = document.getElementById('btnClear');
-        const toast = document.getElementById('toast');
-        const loadingOverlay = document.getElementById('loadingOverlay');
+        <hr class="border-slate-100">
 
-        const tabPreview = document.getElementById('tabPreview');
-        const tabCode = document.getElementById('tabCode');
-        const containerPreview = document.getElementById('containerPreview');
-        const containerCode = document.getElementById('containerCode');
+        <!-- 情報 -->
+        <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
+          <div class="flex justify-between text-sm">
+            <span class="text-slate-500">バージョン</span>
+            <span class="font-mono text-slate-800">1.8.0</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-slate-500">開発者</span>
+            <span class="font-semibold text-indigo-600">tomfxz7</span>
+          </div>
+        </div>
 
-        // --- Tab Switch Logic ---
-        function switchTab(activeTab, inactiveTab, showContainer, hideContainer) {
-            activeTab.className = "flex-1 py-4 text-xs font-black tracking-widest uppercase tab-active";
-            inactiveTab.className = "flex-1 py-4 text-xs font-black tracking-widest uppercase text-slate-400 border-b-3 border-transparent";
-            showContainer.classList.remove('hidden');
-            hideContainer.classList.add('hidden');
-        }
+        <hr class="border-slate-100">
 
-        tabPreview.onclick = () => switchTab(tabPreview, tabCode, containerPreview, containerCode);
-        tabCode.onclick = () => switchTab(tabCode, tabPreview, containerCode, containerPreview);
+        <!-- 初期化 -->
+        <div>
+          <button id="btn-reset-all" class="w-full py-2.5 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+            すべてのデータを初期化
+          </button>
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 flex justify-end">
+        <button id="btn-confirm-settings" class="px-6 py-2 bg-slate-900 text-white rounded-xl font-medium">閉じる</button>
+      </div>
+    </div>
+  </div>
 
-        function showToast(text) {
-            toast.innerText = text;
-            toast.classList.remove('opacity-0', 'translate-y-10');
-            toast.classList.add('opacity-100', 'translate-y-0');
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-10');
-                toast.classList.remove('opacity-100', 'translate-y-0');
-            }, 3000);
-        }
+  <!-- インポート確認モーダル -->
+  <div id="import-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] items-center justify-center p-4 hidden animate-fade-in">
+    <div class="bg-white p-6 rounded-3xl shadow-xl max-w-md w-full animate-zoom-in">
+      <h3 class="text-xl font-bold text-slate-800 mb-2">インポート方法</h3>
+      <p id="import-msg" class="text-slate-600 text-sm mb-6"></p>
+      <div class="flex flex-col gap-3">
+        <button id="btn-import-append" class="w-full text-left p-4 rounded-xl border hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+          <div class="font-semibold">既存のリストに追加</div>
+          <div class="text-xs text-slate-500">現在のアプリを残したまま追加します。</div>
+        </button>
+        <button id="btn-import-overwrite" class="w-full text-left p-4 rounded-xl border hover:border-red-400 hover:bg-red-50 transition-colors">
+          <div class="font-semibold text-red-600">全て上書き</div>
+          <div class="text-xs text-slate-500">現在のリストを消去して置き換えます。</div>
+        </button>
+        <button id="btn-import-cancel" class="w-full mt-2 p-3 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">キャンセル</button>
+      </div>
+    </div>
+  </div>
 
-        // --- Logic: Parse Lucide Imports (Supports Aliases like { Image as ImageIcon }) ---
-        function parseLucideIcons(source) {
-            const iconMap = [];
-            // Regex for matching the curly brace content of lucide-react imports
-            // Example: import { FolderOpen, Image as ImageIcon } from 'lucide-react';
-            const lucideImportRegex = /import\s+{([\s\S]+?)}\s+from\s+['"]lucide-react['"]/g;
-            let match;
-            while ((match = lucideImportRegex.exec(source)) !== null) {
-                const parts = match[1].split(',');
-                parts.forEach(part => {
-                    const cleanPart = part.trim();
-                    if (!cleanPart) return;
-                    
-                    if (cleanPart.includes(' as ')) {
-                        const [original, alias] = cleanPart.split(/\s+as\s+/);
-                        iconMap.push({ original: original.trim(), alias: alias.trim() });
-                    } else {
-                        iconMap.push({ original: cleanPart, alias: cleanPart });
+  <!-- 確認・アラートモーダル -->
+  <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[120] items-center justify-center p-4 hidden animate-fade-in">
+    <div class="bg-white p-6 rounded-3xl shadow-xl max-w-sm w-full animate-zoom-in">
+      <h3 id="confirm-title" class="text-lg font-bold text-slate-800 mb-2"></h3>
+      <p id="confirm-msg" class="text-slate-600 text-sm mb-6"></p>
+      <div class="flex gap-3 justify-end">
+        <button id="btn-confirm-cancel" class="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg">キャンセル</button>
+        <button id="btn-confirm-ok" class="px-4 py-2 bg-red-600 text-white rounded-lg">実行する</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="alert-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[130] items-center justify-center p-4 hidden animate-fade-in">
+    <div class="bg-white p-6 rounded-3xl shadow-xl max-w-sm w-full text-center animate-zoom-in">
+      <div class="mx-auto w-12 h-12 bg-indigo-100 text-indigo-500 rounded-full flex items-center justify-center mb-4">
+        <i data-lucide="info" class="w-7 h-7"></i>
+      </div>
+      <p id="alert-msg" class="text-slate-800 font-medium mb-6 leading-relaxed whitespace-pre-wrap"></p>
+      <button id="btn-alert-ok" class="w-full py-2.5 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors">
+        確認
+      </button>
+    </div>
+  </div>
+
+  <!-- D&Dオーバーレイ -->
+  <div id="drop-overlay" class="fixed inset-0 bg-indigo-600/90 z-[200] hidden flex-col items-center justify-center text-white border-8 border-indigo-300 border-dashed m-4 rounded-3xl pointer-events-none transition-opacity duration-200">
+    <i data-lucide="file-code" class="w-20 h-20 mb-4"></i>
+    <h2 class="text-3xl font-bold">ファイルをドロップ</h2>
+    <p class="mt-2 text-indigo-100 font-medium">複数のHTMLを一気に追加できます</p>
+  </div>
+
+  <!-- ====================
+       JavaScript ロジック
+  ==================== -->
+  <script>
+    // --- 戻る・進む (ハッシュルーティング) の監視 ---
+    window.addEventListener('hashchange', () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const tabFromHash = hashParams.get('tab') || 'home';
+      
+      if (tabFromHash === 'home' || apps.find(a => a.id === tabFromHash)) {
+          switchTab(tabFromHash, true);
+      } else {
+          switchTab('home', true);
+      }
+    });
+
+    // --- IndexedDB ラッパー (大容量保存用) ---
+    const DB_NAME = 'WebAppHubDB';
+    const STORE_NAME = 'appsStore';
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+          e.target.result.createObjectStore(STORE_NAME);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function idbGet(key) {
+      try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      } catch (e) {
+        console.warn("IndexedDB GET error", e);
+        return null;
+      }
+    }
+
+    async function idbSet(key, value) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.put(value, key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    // --- 状態管理 ---
+    let apps = [];
+    let openAppIds = []; 
+    let activeTabId = 'home';
+    let sortOption = 'date-asc';
+    
+    // エディタ状態管理
+    let currentEditingAppId = null;
+    let currentImageUrl = '';
+    let currentCodeType = 'html'; 
+    let currentGithubUrl = '';
+    
+    // 編集中のコードや、登録済みの種類を追跡する
+    let editorDraftHtml = '';
+    let editorDraftReact = '';
+    let originalAppCodeType = null;
+
+    let importPendingData = null;
+    let confirmCallback = null;
+    
+    // 設定
+    let tabDisplayMode = 'full'; 
+
+    // --- GitHub 同期共通ロジック ---
+    async function syncGithubCode(appId, iconElement = null) {
+        const app = apps.find(a => a.id === appId);
+        if (!app || !app.githubUrl) return;
+
+        if (iconElement) iconElement.classList.add('animate-spin');
+
+        try {
+            // エディタの「取得」と同じ堅牢なURLパース
+            let url = app.githubUrl;
+            try {
+                const urlObj = new URL(url);
+                urlObj.search = ''; urlObj.hash = '';
+                if (urlObj.hostname === 'github.com') {
+                    const parts = urlObj.pathname.split('/');
+                    if (parts[3] === 'blob' || parts[3] === 'raw') {
+                        parts.splice(3, 1);
+                        urlObj.hostname = 'raw.githubusercontent.com';
+                        urlObj.pathname = parts.join('/');
                     }
-                });
+                }
+                url = urlObj.toString();
+            } catch (e) {}
+
+            let fetchUrl = url;
+            try {
+                const u = new URL(url);
+                u.searchParams.set('_t', Date.now()); // キャッシュ回避
+                fetchUrl = u.toString();
+            } catch(e) {}
+
+            const response = await fetch(fetchUrl, { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
+            const sourceCode = await response.text();
+
+            // エディタの「保存して登録」と同じロジック
+            const isReact = url.match(/\.(jsx|tsx|js)$/i) || app.codeType === 'react';
+            const saveCodeType = isReact ? 'react' : 'html';
+            
+            let runnableHtml = sourceCode;
+            if (saveCodeType === 'react') {
+                try {
+                    runnableHtml = generateReactHTML(sourceCode, app.name);
+                } catch(e) {
+                    runnableHtml = "<!-- React Parse Error -->";
+                    console.error('React parse error during sync:', e);
+                }
             }
-            return iconMap;
+
+            const historyItem = {
+                timestamp: Date.now(),
+                name: app.name,
+                codeType: saveCodeType,
+                sourceCode: sourceCode,
+                imageUrl: app.imageUrl
+            };
+
+            const newHistory = [...(app.history || []), historyItem].slice(-10);
+
+            const updatedApp = { 
+                ...app, 
+                codeType: saveCodeType, 
+                sourceCode: sourceCode, 
+                html: runnableHtml, 
+                history: newHistory 
+            };
+
+            // 保存して画面に反映
+            apps = apps.map(a => a.id === app.id ? updatedApp : a);
+            await saveData();
+
+            const iframe = document.getElementById(`iframe-${app.id}`);
+            if (iframe) iframe.srcdoc = injectStorageShim(app.id, runnableHtml);
+
+            renderGrid();
+            showAlert('GitHubから最新のコードに同期しました！');
+
+            // もし編集画面を開いたまま同期した場合、エディタ上の表示も更新する
+            if (currentEditingAppId === app.id && !document.getElementById('editor-modal').classList.contains('hidden')) {
+                openEditor(updatedApp);
+            }
+
+        } catch(err) {
+            console.error(err);
+            showAlert('同期に失敗しました。\n' + err.message);
+        } finally {
+            if (iconElement) iconElement.classList.remove('animate-spin');
+        }
+    }
+
+    // --- デフォルトコード ---
+    const htmlDefaultCode = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>New App</title>
+  <style>
+    body { font-family: sans-serif; display: grid; place-items: center; height: 100vh; margin: 0; background-color: #f8fafc; }
+    h1 { color: #334155; }
+  </style>
+</head>
+<body>
+  <h1>Hello World</h1>
+</body>
+</html>`;
+
+    const reactDefaultCode = `import React, { useState } from 'react';
+import { Play } from 'lucide-react';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div className="flex flex-col h-screen items-center justify-center bg-slate-50 gap-4">
+      <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
+        <Play className="text-indigo-500" /> React App
+      </h1>
+      <button 
+        onClick={() => setCount(c => c + 1)}
+        className="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition font-bold"
+      >
+        Count is: {count}
+      </button>
+    </div>
+  );
+}`;
+
+    // --- DOM要素 ---
+    const gridContainer = document.getElementById('app-grid');
+    const tabContainer = document.getElementById('tab-container');
+    const iframeManager = document.getElementById('iframe-manager');
+    const mainView = document.getElementById('main-view');
+    const runnerView = document.getElementById('runner-view');
+    const sortSelect = document.getElementById('sort-select');
+    const editorModal = document.getElementById('editor-modal');
+    const settingsModal = document.getElementById('settings-modal');
+    const homeTools = document.getElementById('home-tools');
+    const runnerTools = document.getElementById('runner-tools');
+    const btnTypeHtml = document.getElementById('btn-type-html');
+    const btnTypeReact = document.getElementById('btn-type-react');
+    const nameInput = document.getElementById('editor-name');
+    const htmlInput = document.getElementById('editor-html');
+    const urlInput = document.getElementById('editor-image-url');
+    const previewArea = document.getElementById('editor-image-preview');
+
+    // --- モーダル制御ヘルパー ---
+    const openModal = (modal) => {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    };
+    const closeModal = (modal) => {
+      modal.classList.remove('flex');
+      modal.classList.add('hidden');
+    };
+
+    function showAlert(msg) {
+      document.getElementById('alert-msg').textContent = msg;
+      openModal(document.getElementById('alert-modal'));
+    }
+    document.getElementById('btn-alert-ok').onclick = () => {
+      closeModal(document.getElementById('alert-modal'));
+    };
+
+    // --- ユーティリティ ---
+    const generateId = () => {
+      try { return crypto.randomUUID(); } catch(e) { 
+        return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9); 
+      }
+    };
+    const escapeHTML = (str) => {
+      if (!str) return '';
+      return str.replace(/[&<>'"]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[tag] || tag));
+    };
+    
+    const getColorFromName = (name) => {
+      const colors = ['from-red-400 to-rose-600', 'from-orange-400 to-red-500', 'from-amber-400 to-orange-500', 'from-emerald-400 to-teal-600', 'from-cyan-400 to-blue-600', 'from-blue-500 to-indigo-600', 'from-violet-500 to-purple-600', 'from-fuchsia-400 to-pink-600'];
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      return colors[Math.abs(hash) % colors.length];
+    };
+
+    // --- 初期化 ---
+    async function init() {
+      // IndexedDB からデータを取得
+      let savedData = await idbGet('webapp_hub_data');
+      
+      // IndexedDBにデータがない場合、過去のlocalStorageから移行を試みる
+      if (!savedData) {
+        const lsData = localStorage.getItem('webapp_hub_data');
+        if (lsData) {
+          try {
+            savedData = JSON.parse(lsData);
+            // 移行成功したら IndexedDB に保存しておく
+            await idbSet('webapp_hub_data', savedData);
+          } catch(e) {}
+        }
+      }
+
+      if (savedData && Array.isArray(savedData)) {
+        try { 
+            apps = savedData.map(app => ({
+                ...app,
+                codeType: app.codeType || 'html',
+                sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
+                history: app.history || [],
+                githubUrl: app.githubUrl || ''
+            }));
+        } catch (e) { console.error('Data error'); }
+      }
+
+      const savedSort = localStorage.getItem('webapp_hub_sort');
+      if (savedSort) {
+        sortOption = savedSort;
+        sortSelect.value = sortOption;
+      }
+      const savedSettings = localStorage.getItem('webapp_hub_settings');
+      if (savedSettings) {
+        try {
+          const config = JSON.parse(savedSettings);
+          tabDisplayMode = config.tabDisplayMode || 'full';
+        } catch(e) {}
+      }
+
+      renderGrid();
+
+      // 初期ロード時にハッシュパラメータをチェックし、タブを合わせる
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const tabFromHash = hashParams.get('tab');
+
+      if (tabFromHash && apps.find(a => a.id === tabFromHash)) {
+          switchTab(tabFromHash, true);
+      } else {
+          switchTab('home', true);
+      }
+
+      updateSettingsUI();
+      lucide.createIcons();
+    }
+
+    async function saveData() {
+      try {
+        await idbSet('webapp_hub_data', apps);
+      } catch (e) {
+        console.error("Data save error:", e);
+        showAlert('データの保存に失敗しました。デバイスの空き容量を確認してください。');
+      }
+      localStorage.setItem('webapp_hub_sort', sortOption);
+      localStorage.setItem('webapp_hub_settings', JSON.stringify({ tabDisplayMode }));
+    }
+
+    // --- レンダリング系 ---
+    function renderGrid() {
+      const sortedApps = [...apps].sort((a, b) => {
+        if (sortOption === 'name-asc') return a.name.localeCompare(b.name, 'ja');
+        if (sortOption === 'name-desc') return b.name.localeCompare(a.name, 'ja');
+        if (sortOption === 'date-asc') return (a.createdAt || 0) - (b.createdAt || 0);
+        if (sortOption === 'date-desc') return (b.createdAt || 0) - (a.createdAt || 0);
+        return 0;
+      });
+
+      gridContainer.innerHTML = '';
+
+      const addBtn = document.createElement('button');
+      addBtn.className = "aspect-square flex flex-col items-center justify-center gap-4 rounded-3xl bg-white border-2 border-dashed border-slate-200 text-slate-400 hover:border-indigo-400 hover:text-indigo-600 transition-all group shadow-sm";
+      addBtn.onclick = () => openEditor();
+      addBtn.innerHTML = `
+        <div class="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-indigo-50 group-hover:scale-110 transition-all duration-300">
+          <i data-lucide="plus" class="w-8 h-8" stroke-width="2.5"></i>
+        </div>
+        <span class="font-bold text-xs uppercase tracking-widest">アプリを追加</span>
+      `;
+      gridContainer.appendChild(addBtn);
+
+      sortedApps.forEach(app => {
+        const tile = document.createElement('div');
+        tile.className = "aspect-square relative group rounded-3xl bg-white shadow-sm hover:shadow-xl border border-slate-100 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center p-4 hover:-translate-y-1";
+        tile.onclick = () => switchTab(app.id);
+
+        let iconContent = app.imageUrl 
+          ? `<img src="${escapeHTML(app.imageUrl)}" class="w-full h-full object-cover" />` 
+          : app.name.substring(0, 2).toUpperCase();
+        const bgClass = app.imageUrl ? 'bg-slate-50' : `bg-gradient-to-br ${getColorFromName(app.name)} text-white`;
+
+        const badge = app.codeType === 'react' 
+            ? `<div class="absolute top-3 left-3 bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm z-10"><i data-lucide="file-json" class="w-2.5 h-2.5 inline mr-0.5"></i>React</div>`
+            : '';
+
+        const btnSync = app.githubUrl ? `<button class="btn-sync p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-green-600 border border-slate-100 shadow-sm" title="GitHubから最新のコードに更新"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>` : '';
+
+        tile.innerHTML = `
+          ${badge}
+          <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            ${btnSync}
+            <button class="btn-edit p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-blue-600 border border-slate-100 shadow-sm"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
+            <button class="btn-delete p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-red-600 border border-slate-100 shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+          </div>
+          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl ${bgClass} flex items-center justify-center text-2xl font-bold shadow-lg mb-3 ring-4 ring-white overflow-hidden group-hover:scale-105 transition-transform">
+            ${iconContent}
+          </div>
+          <h3 class="font-bold text-slate-800 text-center w-full truncate px-2 text-xs sm:text-sm">${escapeHTML(app.name)}</h3>
+        `;
+
+        if (app.githubUrl) {
+          tile.querySelector('.btn-sync').onclick = (e) => {
+            e.stopPropagation();
+            const icon = e.currentTarget.querySelector('i');
+            if (icon.classList.contains('animate-spin')) return;
+            syncGithubCode(app.id, icon);
+          };
         }
 
-        // --- Logic: Build the Final Standalone HTML ---
-        function generateHTML(source) {
-            // 1. Extract icons with alias support
-            const iconMap = parseLucideIcons(source);
-            const iconShims = iconMap.map(icon => 
-                `const ${icon.alias} = (props) => <Icon name="${icon.original}" {...props} />;`
-            ).join('\n        ');
+        tile.querySelector('.btn-edit').onclick = (e) => { e.stopPropagation(); openEditor(app); };
+        tile.querySelector('.btn-delete').onclick = (e) => { e.stopPropagation(); requestDelete(app); };
 
-            // 2. Remove all import statements
-            let processedCode = source.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '');
-            
-            // 3. Detect main component (default export)
-            let mainComponentName = "App";
-            const exportMatch = source.match(/export\s+default\s+(?:function\s+([A-Za-z0-9_]+)|([A-Za-z0-9_]+))/);
-            if (exportMatch) {
-                mainComponentName = exportMatch[1] || exportMatch[2];
-            }
+        gridContainer.appendChild(tile);
+      });
+      lucide.createIcons({ root: gridContainer });
+    }
 
-            // 4. Clean exports to make them valid in a browser script
-            processedCode = processedCode.replace(/export\s+default\s+function/g, 'function');
-            processedCode = processedCode.replace(/export\s+default\s+/g, `const ${mainComponentName} = `);
+    function renderTabs() {
+      tabContainer.innerHTML = '';
 
-            // 5. Wrap everything in a single-file template
-            return `<!DOCTYPE html>
+      openAppIds.forEach(id => {
+        const app = apps.find(a => a.id === id);
+        if (!app) return;
+
+        const tab = document.createElement('button');
+        const isActive = activeTabId === id;
+        tab.className = `group flex items-center gap-2 h-full font-bold text-sm transition-all shrink-0 border-x border-slate-100 ${isActive ? 'tab-active' : 'text-slate-400 hover:bg-slate-50'} ${tabDisplayMode === 'icon-only' ? 'px-2' : 'pl-4 pr-2'}`;
+        tab.onclick = () => switchTab(id);
+        tab.onmousedown = (e) => { if(e.button === 1) { e.preventDefault(); closeTab(id); } }; 
+
+        if (tabDisplayMode === 'icon-only') {
+          let iconInner = '';
+          if (app.imageUrl) {
+            iconInner = `<img src="${escapeHTML(app.imageUrl)}" class="w-6 h-6 rounded-md object-cover border border-slate-200" />`;
+          } else {
+            iconInner = `<div class="w-6 h-6 rounded-md bg-gradient-to-br ${getColorFromName(app.name)} text-white flex items-center justify-center text-[10px] shadow-sm">${app.name.substring(0, 1).toUpperCase()}</div>`;
+          }
+          tab.innerHTML = `
+            <div class="flex items-center gap-1">
+              ${iconInner}
+              <div class="btn-close-tab p-1 rounded-md hover:bg-slate-200 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                <i data-lucide="x" class="w-3 h-3"></i>
+              </div>
+            </div>
+          `;
+        } else {
+          tab.innerHTML = `
+            <span class="truncate max-w-[120px]">${escapeHTML(app.name)}</span>
+            <div class="btn-close-tab p-1 rounded-md hover:bg-slate-200 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+              <i data-lucide="x" class="w-3 h-3"></i>
+            </div>
+          `;
+        }
+        
+        tab.querySelector('.btn-close-tab').onclick = (e) => { e.stopPropagation(); closeTab(id); };
+        tabContainer.appendChild(tab);
+      });
+      lucide.createIcons({ root: tabContainer });
+    }
+
+    function updateView() {
+      if (activeTabId === 'home') {
+        mainView.style.display = 'block';
+        runnerView.style.display = 'none';
+        homeTools.classList.remove('hidden');
+        runnerTools.classList.add('hidden');
+      } else {
+        mainView.style.display = 'none';
+        runnerView.style.display = 'flex';
+        homeTools.classList.add('hidden');
+        runnerTools.classList.remove('hidden');
+        
+        Array.from(iframeManager.children).forEach(iframe => {
+          iframe.classList.toggle('hidden', iframe.id !== `iframe-${activeTabId}`);
+        });
+      }
+    }
+
+    // --- タブ・Iframe管理 ---
+    function switchTab(id, skipHistory = false) {
+      if (id !== 'home' && !openAppIds.includes(id)) {
+        const app = apps.find(a => a.id === id);
+        if (!app) {
+            id = 'home'; // 万が一IDが存在しない場合はホームへフォールバック
+        } else {
+            openAppIds.push(id);
+            const iframe = document.createElement('iframe');
+            iframe.id = `iframe-${id}`;
+            iframe.className = "absolute inset-0 w-full h-full border-none hidden bg-white";
+            iframe.sandbox = "allow-scripts allow-forms allow-modals allow-downloads allow-same-origin";
+            iframe.srcdoc = injectStorageShim(id, app.html);
+            iframeManager.appendChild(iframe);
+        }
+      }
+
+      // 履歴を追加（同一タブへの連続クリック時は追加しない）
+      if (!skipHistory && activeTabId !== id) {
+          try {
+              window.location.hash = id === 'home' ? '' : 'tab=' + id;
+          } catch (e) {
+              console.warn('Hash routing is restricted in this environment', e);
+          }
+      }
+
+      activeTabId = id;
+      renderTabs();
+      updateView();
+    }
+
+    function closeTab(id) {
+      openAppIds = openAppIds.filter(oid => oid !== id);
+      const iframe = document.getElementById(`iframe-${id}`);
+      if (iframe) iframe.remove();
+
+      if (activeTabId === id) {
+        const nextTabId = openAppIds.length > 0 ? openAppIds[openAppIds.length-1] : 'home';
+        switchTab(nextTabId);
+      } else {
+        renderTabs();
+        updateView();
+      }
+    }
+
+    function reloadActiveApp() {
+      if (activeTabId === 'home') return;
+      const app = apps.find(a => a.id === activeTabId);
+      const iframe = document.getElementById(`iframe-${activeTabId}`);
+      if (app && iframe) {
+        iframe.srcdoc = '';
+        setTimeout(() => { iframe.srcdoc = injectStorageShim(app.id, app.html); }, 50);
+      }
+    }
+
+    function injectStorageShim(appId, html) {
+      const shim = `<script>
+        (function() {
+          const appId = "${appId}";
+          const prefix = "webapp_hub_scoped_" + appId + "_";
+          const originalLS = window.localStorage;
+          const scopedLS = {
+            getItem: (key) => originalLS.getItem(prefix + key),
+            setItem: (key, val) => originalLS.setItem(prefix + key, val),
+            removeItem: (key) => originalLS.removeItem(prefix + key),
+            clear: () => { Object.keys(originalLS).forEach(k => { if(k.startsWith(prefix)) originalLS.removeItem(k); }); },
+            key: (i) => {
+              const keys = Object.keys(originalLS).filter(k => k.startsWith(prefix));
+              return keys[i] ? keys[i].replace(prefix, '') : null;
+            },
+            get length() { return Object.keys(originalLS).filter(k => k.startsWith(prefix)).length; }
+          };
+          Object.defineProperty(window, 'localStorage', { get: () => scopedLS, configurable: true });
+        })();
+      <\/script>`;
+      
+      if (html.includes('<head>')) {
+        return html.replace('<head>', '<head>\n' + shim);
+      }
+      return shim + '\n' + html;
+    }
+
+    // --- React to HTML 変換エンジン ---
+    function parseLucideIcons(source) {
+        const iconMap = [];
+        const lucideImportRegex = /import\s+{([\s\S]+?)}\s+from\s+['"]lucide-react['"]/g;
+        let match;
+        while ((match = lucideImportRegex.exec(source)) !== null) {
+            const parts = match[1].split(',');
+            parts.forEach(part => {
+                const cleanPart = part.trim();
+                if (!cleanPart) return;
+                
+                if (cleanPart.includes(' as ')) {
+                    const [original, alias] = cleanPart.split(/\s+as\s+/);
+                    iconMap.push({ original: original.trim(), alias: alias.trim() });
+                } else {
+                    iconMap.push({ original: cleanPart, alias: cleanPart });
+                }
+            });
+        }
+        return iconMap;
+    }
+
+    function generateReactHTML(source, appName) {
+        const iconMap = parseLucideIcons(source);
+        const iconShims = iconMap.map(icon => 
+            `const ${icon.alias} = (props) => <Icon name="${icon.original}" {...props} />;`
+        ).join('\n        ');
+
+        let processedCode = source.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '');
+        
+        let mainComponentName = "App";
+        const exportMatch = source.match(/export\s+default\s+(?:function\s+([A-Za-z0-9_]+)|([A-Za-z0-9_]+))/);
+        if (exportMatch) {
+            mainComponentName = exportMatch[1] || exportMatch[2];
+        }
+
+        processedCode = processedCode.replace(/export\s+default\s+function/g, 'function');
+        processedCode = processedCode.replace(/export\s+default\s+/g, `const ${mainComponentName} = `);
+
+        return `<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Reproduced React App</title>
+    <title>${escapeHTML(appName)}</title>
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"><\/script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
@@ -182,128 +923,639 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
         * { -webkit-tap-highlight-color: transparent; }
-        /* Hide scrollbars for a cleaner UI in the reproduced app */
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
-        /**
-         * System Hooks & Helpers
-         */
         const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
-        /**
-         * Lucide Icon Wrapper
-         * Handles mapping React-style names to the browser bundle's kebab-case naming.
-         */
         const Icon = ({ name, size = 24, strokeWidth = 2, className = "", color = "currentColor", ...props }) => {
-            const iconRef = useRef(null);
+            const [svgContent, setSvgContent] = useState("");
+            
             useEffect(() => {
-                if (window.lucide && iconRef.current) {
+                if (window.lucide) {
                     const kebabName = name
                         .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
                         .replace(/([a-zA-Z])([0-9])/g, '$1-$2')
                         .toLowerCase();
-                    iconRef.current.innerHTML = '<i data-lucide="' + kebabName + '"></i>';
-                    window.lucide.createIcons({
-                        attrs: { 
-                            width: size, 
-                            height: size, 
-                            "stroke-width": strokeWidth, 
-                            stroke: color,
-                            class: className 
-                        },
-                        nameAttr: 'data-lucide'
-                    });
+                    const temp = document.createElement('div');
+                    temp.innerHTML = '<i data-lucide="' + kebabName + '"></i>';
+                    window.lucide.createIcons({ root: temp });
+                    const svgNode = temp.querySelector('svg');
+                    if (svgNode) {
+                        setSvgContent(svgNode.innerHTML);
+                    }
                 }
-            }, [name, size, strokeWidth, className, color]);
-            return <span ref={iconRef} className={"inline-flex items-center justify-center " + className} {...props}></span>;
+            }, [name]);
+
+            return (
+                <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width={size} 
+                    height={size} 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke={color} 
+                    strokeWidth={strokeWidth} 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className={className} 
+                    {...props}
+                    dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+            );
         };
 
-        /**
-         * Lucide Icon Shims (Generated from imports)
-         */
         ${iconShims}
 
-        /**
-         * --- User Original Code Section ---
-         */
         ${processedCode}
-        /**
-         * --- End of User Original Code ---
-         */
 
-        /**
-         * Entry Point
-         */
-        const rootElement = document.getElementById('root');
-        const root = ReactDOM.createRoot(rootElement);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<${mainComponentName} />);
     <\/script>
 </body>
 </html>`;
+    }
+
+    // --- エディタ関連ロジック ---
+    function setCodeTypeUI(type) {
+        // 現在の入力を下書きに保存する
+        if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
+            editorDraftHtml = htmlInput.value;
+        } else if (currentCodeType === 'react' && !currentGithubUrl) {
+            editorDraftReact = htmlInput.value;
         }
 
-        // --- App Interactions ---
-        btnConvert.onclick = () => {
-            const rawSource = inputCode.value.trim();
-            if (!rawSource) {
-                showToast("Please paste some React code first.");
-                return;
+        currentCodeType = type;
+        const isLinked = !!currentGithubUrl;
+        
+        if (type === 'html') {
+            btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all";
+            btnTypeReact.className = "px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all";
+            
+            htmlInput.value = editorDraftHtml;
+
+            // Reactとして登録済みの場合は、HTMLは変換結果として扱いリードオンリーにする
+            if (originalAppCodeType === 'react' || isLinked) {
+                htmlInput.readOnly = true;
+                htmlInput.classList.add('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.remove('bg-slate-900', 'text-slate-100');
+            } else {
+                htmlInput.readOnly = false;
+                htmlInput.classList.remove('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.add('bg-slate-900', 'text-slate-100');
+            }
+        } else {
+            btnTypeReact.className = "px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all";
+            btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all";
+            
+            htmlInput.value = editorDraftReact;
+            
+            if (isLinked) {
+                htmlInput.readOnly = true;
+                htmlInput.classList.add('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.remove('bg-slate-900', 'text-slate-100');
+            } else {
+                htmlInput.readOnly = false;
+                htmlInput.classList.remove('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.add('bg-slate-900', 'text-slate-100');
+            }
+        }
+    }
+
+    btnTypeHtml.onclick = () => { if (currentCodeType !== 'html') setCodeTypeUI('html'); };
+    btnTypeReact.onclick = () => { if (currentCodeType !== 'react') setCodeTypeUI('react'); };
+
+    function openEditor(app = null) {
+      currentEditingAppId = app?.id || null;
+      nameInput.value = app?.name || '';
+      
+      const ghInput = document.getElementById('github-url-input');
+      const ghBtn = document.getElementById('btn-fetch-github');
+
+      if (app) {
+          originalAppCodeType = app.codeType || 'html';
+          editorDraftHtml = app.html || '';
+          editorDraftReact = app.sourceCode || '';
+          currentGithubUrl = app.githubUrl || '';
+          
+          currentCodeType = ''; // 強制更新のため一度リセット
+          setCodeTypeUI(originalAppCodeType);
+      } else {
+          originalAppCodeType = null;
+          editorDraftHtml = htmlDefaultCode;
+          editorDraftReact = reactDefaultCode;
+          currentGithubUrl = '';
+          
+          currentCodeType = ''; // 強制更新のため一度リセット
+          setCodeTypeUI('html');
+      }
+
+      if (currentGithubUrl) {
+          ghInput.value = currentGithubUrl;
+          ghInput.readOnly = true;
+          ghInput.classList.add('bg-slate-100', 'text-slate-500');
+          ghBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新';
+      } else {
+          ghInput.value = '';
+          ghInput.readOnly = false;
+          ghInput.classList.remove('bg-slate-100', 'text-slate-500');
+          ghBtn.innerHTML = '<i data-lucide="download-cloud" class="w-4 h-4"></i>取得';
+      }
+
+      currentImageUrl = app?.imageUrl || '';
+      urlInput.value = currentImageUrl;
+      
+      document.getElementById('editor-title').textContent = app ? 'アプリを編集' : '新規アプリを登録';
+      updateImagePreviewUI();
+      renderHistory(app);
+      openModal(editorModal);
+      lucide.createIcons({ root: editorModal });
+    }
+
+    function updateImagePreviewUI() {
+      const clearBtn = document.getElementById('btn-clear-image');
+      if (currentImageUrl) {
+        previewArea.innerHTML = `<img src="${escapeHTML(currentImageUrl)}" class="w-full h-full object-cover" />`;
+        clearBtn.classList.remove('hidden');
+      } else {
+        previewArea.innerHTML = `<i data-lucide="image" class="w-8 h-8"></i>`;
+        clearBtn.classList.add('hidden');
+      }
+      lucide.createIcons({ root: previewArea });
+    }
+
+    function renderHistory(app) {
+      const section = document.getElementById('editor-history-section');
+      const list = document.getElementById('editor-history-list');
+      list.innerHTML = '';
+      
+      if (!app || !app.history || app.history.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+      section.classList.remove('hidden');
+      
+      [...app.history].reverse().forEach(h => {
+        const d = new Date(h.timestamp);
+        const li = document.createElement('li');
+        li.className = "flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 border border-transparent hover:border-slate-200 text-sm transition-colors";
+        li.innerHTML = `
+          <div class="flex flex-col">
+            <span class="font-medium text-slate-700">${d.toLocaleString()}</span>
+            <span class="text-[10px] text-slate-500 font-bold tracking-wider">${h.codeType === 'react' ? 'REACT' : 'HTML'}</span>
+          </div>
+          <button class="btn-restore px-3 py-1 bg-white border border-slate-300 rounded shadow-sm text-xs text-indigo-600 hover:bg-indigo-50 font-bold transition-colors">復元</button>
+        `;
+        li.querySelector('.btn-restore').onclick = () => {
+          nameInput.value = h.name || '';
+          currentImageUrl = h.imageUrl || '';
+          urlInput.value = currentImageUrl;
+          
+          originalAppCodeType = h.codeType || 'html';
+          // 履歴から復元する際、軽量化されたsourceCodeを利用する
+          editorDraftHtml = h.sourceCode || h.html || '';
+          editorDraftReact = h.sourceCode || h.html || '';
+          
+          currentCodeType = ''; 
+          setCodeTypeUI(originalAppCodeType);
+          
+          updateImagePreviewUI();
+          showAlert('過去のバージョンをエディタに復元しました。\n「保存して登録」を押すと新しいバージョンとして保存されます。\n※GitHub連携は解除されます。');
+          
+          // 復元時はGitHub連携を一旦解除する（ユーザーが手動でいじれるように）
+          currentGithubUrl = '';
+          const ghInput = document.getElementById('github-url-input');
+          ghInput.value = '';
+          ghInput.readOnly = false;
+          ghInput.classList.remove('bg-slate-100', 'text-slate-500');
+          document.getElementById('btn-fetch-github').innerHTML = '<i data-lucide="download-cloud" class="w-4 h-4"></i>取得';
+          setCodeTypeUI(originalAppCodeType);
+        };
+        list.appendChild(li);
+      });
+    }
+
+    document.getElementById('btn-copy-html').onclick = () => {
+      const sourceCode = htmlInput.value;
+      if (!sourceCode) return;
+      
+      const ta = document.createElement('textarea');
+      ta.value = sourceCode;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      
+      showAlert(currentCodeType === 'react' ? 'Reactソースコードをコピーしました！' : 'HTMLコードをコピーしました！');
+    };
+
+    document.getElementById('btn-clear-code').onclick = () => {
+      if (htmlInput.readOnly) {
+          showAlert(currentGithubUrl ? 'GitHub連携されているためソースコードはクリアできません。' : '変換済みのHTMLは直接編集（クリア）できません。\nReactタブからソースコードを編集してください。');
+          return;
+      }
+      htmlInput.value = '';
+      htmlInput.focus();
+    };
+
+    // GitHubからのコード取得・更新
+    document.getElementById('btn-fetch-github').onclick = async () => {
+      if (currentGithubUrl && currentEditingAppId) {
+          // すでに連携済みで編集画面から更新ボタンを押した場合は、共通同期ロジックを呼ぶ
+          const btn = document.getElementById('btn-fetch-github');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
+          btn.disabled = true;
+          await syncGithubCode(currentEditingAppId, null);
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          lucide.createIcons({ root: btn.parentElement });
+          return;
+      }
+
+      // 新規取得の場合の処理
+      const urlInput = document.getElementById('github-url-input');
+      let url = urlInput.value.trim();
+      if (!url) {
+        showAlert('GitHubのファイルURLを入力してください。');
+        return;
+      }
+
+      // GitHubの通常URLをRaw URLに変換 (より堅牢なパース)
+      try {
+        const urlObj = new URL(url);
+        
+        // GitHubのUIからコピーした際につきやすい不要なパラメータや行数指定(#)を削除
+        urlObj.search = '';
+        urlObj.hash = '';
+
+        if (urlObj.hostname === 'github.com') {
+          const parts = urlObj.pathname.split('/');
+          // parts構造: ["", "ユーザー名", "リポジトリ", "blob"(または"raw"), "ブランチ名", ...]
+          if (parts[3] === 'blob' || parts[3] === 'raw') {
+            parts.splice(3, 1); // "blob" または "raw" の部分を削除
+            urlObj.hostname = 'raw.githubusercontent.com';
+            urlObj.pathname = parts.join('/');
+          }
+        }
+        url = urlObj.toString();
+      } catch (e) {
+        // URLとして正しくない場合は無視（後のFetchでエラーハンドリングさせる）
+      }
+
+      const btn = document.getElementById('btn-fetch-github');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
+      btn.disabled = true;
+
+      try {
+        // キャッシュ回避のためにタイムスタンプを付与
+        let fetchUrl = url;
+        try {
+            const u = new URL(url);
+            u.searchParams.set('_t', Date.now());
+            fetchUrl = u.toString();
+        } catch(e) {}
+
+        const response = await fetch(fetchUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
+        const text = await response.text();
+
+        // 拡張子からコードのタイプを推測
+        const originalUrl = urlInput.value.trim();
+        const isReact = url.match(/\.(jsx|tsx|js)$/i);
+        currentGithubUrl = originalUrl;
+        originalAppCodeType = isReact ? 'react' : 'html';
+
+        if (isReact) {
+            editorDraftReact = text;
+            try {
+                editorDraftHtml = generateReactHTML(text, nameInput.value.trim() || 'App');
+            } catch(e) {
+                editorDraftHtml = "<!-- React Parse Error -->";
+            }
+        } else {
+            editorDraftHtml = text;
+            editorDraftReact = '';
+        }
+
+        setCodeTypeUI(originalAppCodeType);
+        
+        // アプリ名が空ならファイル名から自動設定
+        if (!nameInput.value.trim()) {
+          let fileName = originalUrl.split('/').pop().split('.')[0];
+          if(fileName.includes('?')) fileName = fileName.split('?')[0];
+          if(fileName.includes('#')) fileName = fileName.split('#')[0];
+          nameInput.value = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+        }
+
+        urlInput.readOnly = true;
+        urlInput.classList.add('bg-slate-100', 'text-slate-500');
+        btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新';
+
+        showAlert('GitHubから最新のソースコードを取得しました！');
+      } catch (err) {
+        console.error(err);
+        showAlert('ファイルの取得に失敗しました。\nURLが正しいか、公開リポジトリであるか確認してください。\n\n詳細: ' + err.message);
+        btn.innerHTML = originalText;
+      } finally {
+        btn.disabled = false;
+        lucide.createIcons({ root: btn.parentElement });
+      }
+    };
+
+    document.getElementById('btn-save-editor').onclick = async () => {
+      // 登録時の状態を更新する
+      if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
+          editorDraftHtml = htmlInput.value;
+      } else if (currentCodeType === 'react' && !currentGithubUrl) {
+          editorDraftReact = htmlInput.value;
+      }
+
+      const name = nameInput.value.trim();
+      
+      // 元々Reactで登録されたアプリならHTMLタブを開いたまま保存してもReact扱いにする
+      const saveCodeType = (originalAppCodeType === 'react') ? 'react' : currentCodeType;
+      const sourceCode = (saveCodeType === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
+
+      if (!name || !sourceCode) return;
+
+      const saveBtn = document.getElementById('btn-save-editor');
+      const saveText = document.getElementById('save-editor-text');
+      const saveLoader = document.getElementById('save-editor-loader');
+      
+      saveBtn.disabled = true;
+      saveText.textContent = "変換・保存中...";
+      saveLoader.classList.remove('hidden');
+
+      setTimeout(async () => {
+        try {
+            let runnableHtml = sourceCode;
+            
+            if (saveCodeType === 'react') {
+                runnableHtml = generateReactHTML(sourceCode, name);
             }
 
-            loadingOverlay.classList.remove('hidden');
+            // 容量削減のため、履歴には変換後の重いHTMLを含めない
+            const historyItem = {
+                timestamp: Date.now(),
+                name: name,
+                codeType: saveCodeType,
+                sourceCode: sourceCode,
+                imageUrl: currentImageUrl
+            };
+
+            // エラー時のロールバック用に一時配列を作成
+            let newApps = [...apps];
+
+            if (currentEditingAppId) {
+              const app = newApps.find(a => a.id === currentEditingAppId);
+              // 履歴は最大10件に制限
+              const newHistory = [...(app.history || []), historyItem].slice(-10); 
+              
+              newApps = newApps.map(a => a.id === currentEditingAppId ? { 
+                ...a, name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, history: newHistory, githubUrl: currentGithubUrl 
+              } : a);
+              
+            } else {
+              newApps.push({ 
+                id: generateId(), name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, createdAt: Date.now(), history: [historyItem], githubUrl: currentGithubUrl
+              });
+            }
             
-            setTimeout(() => {
-                try {
-                    const finalHtml = generateHTML(rawSource);
-                    outputHtml.value = finalHtml;
+            // データの保存（非同期）
+            apps = newApps;
+            await saveData();
 
-                    // Update Iframe with Blob for better stability with large files
-                    const blob = new Blob([finalHtml], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    previewFrame.src = url;
+            // iframeの更新
+            if (currentEditingAppId) {
+                const iframe = document.getElementById(`iframe-${currentEditingAppId}`);
+                if (iframe) iframe.srcdoc = injectStorageShim(currentEditingAppId, runnableHtml);
+            }
 
-                    btnDownload.classList.remove('hidden');
-                    showToast("Code successfully reproduced!");
-                    
-                    // Force switch to preview
-                    tabPreview.click();
-                } catch (err) {
-                    console.error("Conversion Error:", err);
-                    showToast("Error parsing the code. Check console.");
-                } finally {
-                    loadingOverlay.classList.add('hidden');
-                }
-            }, 800);
+            renderGrid();
+            closeModal(editorModal);
+
+        } catch (err) {
+            console.error(err);
+            showAlert('【変換・保存エラー】\n' + err.message + '\n\nReactの構文が正しいか確認してください。');
+        } finally {
+            // エラーが起きても絶対にローディング状態を解除する
+            saveBtn.disabled = false;
+            saveText.textContent = "保存して登録";
+            saveLoader.classList.add('hidden');
+        }
+      }, 50);
+    };
+
+    function processImage(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max = 200;
+          let w = img.width, h = img.height;
+          if (w > h) { if (w > max) { h *= max/w; w = max; } } else { if (h > max) { w *= max/h; h = max; } }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          currentImageUrl = canvas.toDataURL('image/webp', 0.8);
+          urlInput.value = "添付画像 (リサイズ済)";
+          updateImagePreviewUI();
         };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
 
-        btnDownload.onclick = () => {
-            if (!outputHtml.value) return;
-            const blob = new Blob([outputHtml.value], { type: 'text/html' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = "reproduced_app.html";
-            a.click();
-            showToast("HTML file saved.");
-        };
+    document.getElementById('btn-trigger-file').onclick = () => document.getElementById('editor-image-file').click();
+    document.getElementById('editor-image-file').onchange = (e) => { if(e.target.files[0]) processImage(e.target.files[0]); };
+    document.getElementById('btn-clear-image').onclick = () => { currentImageUrl = ''; urlInput.value = ''; updateImagePreviewUI(); };
+    urlInput.oninput = (e) => { currentImageUrl = e.target.value; updateImagePreviewUI(); };
+    editorModal.onpaste = (e) => {
+      const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
+      if (item) { processImage(item.getAsFile()); e.preventDefault(); }
+    };
 
-        btnCopy.onclick = () => {
-            outputHtml.select();
-            document.execCommand('copy');
-            showToast("Copied to clipboard.");
-        };
+    // --- 設定関連 ---
+    function openSettings() {
+      openModal(settingsModal);
+      updateSettingsUI();
+    }
+    
+    function updateSettingsUI() {
+      const btnFull = document.getElementById('tab-mode-full');
+      const btnIcon = document.getElementById('tab-mode-icon');
+      
+      const activeClass = "bg-white text-indigo-600 shadow-sm";
+      const inactiveClass = "text-slate-500 hover:text-slate-700";
+      
+      btnFull.className = `flex-1 py-2 text-sm font-medium rounded-lg transition-all ${tabDisplayMode === 'full' ? activeClass : inactiveClass}`;
+      btnIcon.className = `flex-1 py-2 text-sm font-medium rounded-lg transition-all ${tabDisplayMode === 'icon-only' ? activeClass : inactiveClass}`;
+    }
 
-        btnClear.onclick = () => {
-            inputCode.value = "";
-            outputHtml.value = "";
-            previewFrame.src = "about:blank";
-            btnDownload.classList.add('hidden');
-            showToast("Cleared.");
-        };
-    </script>
+    document.getElementById('tab-mode-full').onclick = async () => { tabDisplayMode = 'full'; updateSettingsUI(); await saveData(); renderTabs(); };
+    document.getElementById('tab-mode-icon').onclick = async () => { tabDisplayMode = 'icon-only'; updateSettingsUI(); await saveData(); renderTabs(); };
+    
+    // イベントリスナー
+    document.getElementById('btn-settings').onclick = openSettings;
+    document.getElementById('btn-close-settings').onclick = () => closeModal(settingsModal);
+    document.getElementById('btn-confirm-settings').onclick = () => closeModal(settingsModal);
+
+    // 初期化ボタン
+    document.getElementById('btn-reset-all').onclick = () => {
+      // ダイアログを表示する前に設定画面を閉じる
+      closeModal(settingsModal);
+
+      document.getElementById('confirm-title').textContent = 'すべてのデータを初期化';
+      document.getElementById('confirm-msg').textContent = '登録されたすべてのアプリと設定が削除され、完全に初期状態に戻ります。本当によろしいですか？';
+      confirmCallback = async () => {
+        apps = [];
+        [...openAppIds].forEach(id => closeTab(id));
+        activeTabId = 'home';
+        sortOption = 'date-asc';
+        tabDisplayMode = 'full';
+        sortSelect.value = sortOption;
+        
+        // localStorageをクリア
+        localStorage.removeItem('webapp_hub_sort');
+        localStorage.removeItem('webapp_hub_settings');
+        localStorage.removeItem('webapp_hub_data'); 
+        
+        // IndexedDBをクリア
+        try {
+          const db = await openDB();
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).clear();
+        } catch(e) {
+          console.error("IndexedDB clear error:", e);
+        }
+
+        renderGrid();
+        updateSettingsUI();
+        switchTab('home'); // 履歴を追加しつつホームに戻る
+        showAlert('すべてのデータを初期化しました。');
+      };
+      openModal(document.getElementById('confirm-modal'));
+    };
+
+    // --- モーダル・確認関連 ---
+    document.getElementById('btn-reload-runner').onclick = reloadActiveApp;
+    document.getElementById('btn-close-editor').onclick = () => closeModal(editorModal);
+    document.getElementById('btn-cancel-editor').onclick = () => closeModal(editorModal);
+    sortSelect.onchange = async (e) => { sortOption = e.target.value; await saveData(); renderGrid(); };
+
+    function requestDelete(app) {
+      document.getElementById('confirm-title').textContent = 'アプリの削除';
+      document.getElementById('confirm-msg').textContent = `「${app.name}」を削除しますか？`;
+      confirmCallback = async () => {
+        apps = apps.filter(a => a.id !== app.id);
+        closeTab(app.id);
+        await saveData();
+        renderGrid();
+      };
+      openModal(document.getElementById('confirm-modal'));
+    }
+    document.getElementById('btn-confirm-ok').onclick = () => { confirmCallback?.(); closeModal(document.getElementById('confirm-modal')); };
+    document.getElementById('btn-confirm-cancel').onclick = () => closeModal(document.getElementById('confirm-modal'));
+
+    // ドラッグ＆ドロップ
+    const dropOverlay = document.getElementById('drop-overlay');
+    let dragCounter = 0;
+
+    window.addEventListener('dragenter', (e) => {
+      if (activeTabId !== 'home') return; 
+      e.preventDefault();
+      if (e.dataTransfer.types.includes('Files')) {
+        dragCounter++;
+        dropOverlay.classList.remove('hidden');
+        dropOverlay.classList.add('flex');
+      }
+    });
+
+    window.addEventListener('dragover', (e) => {
+      if (activeTabId !== 'home') return;
+      e.preventDefault();
+    });
+
+    window.addEventListener('dragleave', (e) => {
+      if (activeTabId !== 'home') return;
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        dropOverlay.classList.add('hidden');
+        dropOverlay.classList.remove('flex');
+      }
+    });
+
+    window.addEventListener('drop', (e) => {
+      if (activeTabId !== 'home') return;
+      e.preventDefault();
+      dragCounter = 0;
+      dropOverlay.classList.add('hidden');
+      dropOverlay.classList.remove('flex');
+      
+      Array.from(e.dataTransfer.files).forEach(file => {
+        if (file.name.endsWith('.html')) {
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            apps.push({ id: generateId(), name: file.name.replace(/\.html$/i, ''), codeType: 'html', sourceCode: ev.target.result, html: ev.target.result, imageUrl: '', createdAt: Date.now() });
+            await saveData(); renderGrid();
+          };
+          reader.readAsText(file);
+        }
+      });
+    });
+
+    // インポート・エクスポート
+    document.getElementById('btn-export').onclick = () => {
+      const blob = new Blob([JSON.stringify(apps, null, 2)], {type: 'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `webapp_hub_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    };
+    document.getElementById('btn-import').onclick = () => document.getElementById('import-file-input').click();
+    document.getElementById('import-file-input').onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!Array.isArray(data)) throw new Error();
+          
+          importPendingData = data.map(app => ({
+              ...app,
+              codeType: app.codeType || 'html',
+              sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
+              history: app.history || [],
+              githubUrl: app.githubUrl || ''
+          }));
+
+          document.getElementById('import-msg').textContent = `${data.length} 件のデータが見つかりました。`;
+          openModal(document.getElementById('import-modal'));
+        } catch(e) { showAlert('不正なファイルです。JSON形式であるか確認してください。'); }
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // 連続で同じファイルをインポートできるようにリセット
+    };
+
+    document.getElementById('btn-import-append').onclick = async () => { apps = [...apps, ...importPendingData]; await saveData(); renderGrid(); closeModal(document.getElementById('import-modal')); };
+    document.getElementById('btn-import-overwrite').onclick = async () => { apps = importPendingData; [...openAppIds].forEach(id => closeTab(id)); await saveData(); renderGrid(); closeModal(document.getElementById('import-modal')); };
+    document.getElementById('btn-import-cancel').onclick = () => closeModal(document.getElementById('import-modal'));
+
+    window.onkeydown = (e) => {
+      if ((e.key === 'F5' || (e.ctrlKey && e.key === 'r')) && activeTabId !== 'home') {
+        e.preventDefault(); reloadActiveApp();
+      }
+    };
+
+    init();
+  </script>
 </body>
 </html>
