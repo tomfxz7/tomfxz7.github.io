@@ -130,7 +130,7 @@
   
   <!-- エディタモーダル -->
   <div id="editor-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] items-center justify-center p-4 hidden animate-fade-in">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden animate-zoom-in">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-zoom-in">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
         <h2 class="text-xl font-bold text-slate-800 flex items-center gap-3">
           <div class="bg-indigo-100 p-1.5 rounded-lg text-indigo-600">
@@ -141,7 +141,8 @@
         <button id="btn-close-editor" class="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
       </div>
       <div class="p-6 flex-1 overflow-y-auto bg-slate-50 flex flex-col gap-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[400px]">
+          <!-- 左カラム: メタデータ -->
           <div class="flex flex-col gap-4">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-2">アプリ名</label>
@@ -163,16 +164,48 @@
                 </div>
               </div>
             </div>
+
+            <!-- バージョン履歴セクション (JSで制御) -->
+            <div id="editor-history-section" class="flex flex-col flex-1 hidden">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">バージョン履歴</label>
+              <div class="flex-1 bg-white border border-slate-300 rounded-xl overflow-y-auto max-h-[160px] p-2 shadow-inner">
+                <ul id="editor-history-list" class="flex flex-col gap-1">
+                  <!-- JSで生成 -->
+                </ul>
+              </div>
+            </div>
           </div>
-          <div class="flex flex-col">
-            <label class="block text-sm font-semibold text-slate-700 mb-2">HTMLコード</label>
-            <textarea id="editor-html" class="w-full flex-1 min-h-[300px] font-mono text-sm px-4 py-4 bg-slate-900 text-slate-100 border border-slate-300 rounded-xl focus:outline-none resize-none leading-relaxed" spellcheck="false"></textarea>
+          
+          <!-- 右カラム: コードエディタ -->
+          <div class="flex-1 flex flex-col h-full min-h-[300px]">
+            <div class="flex justify-between items-end mb-2">
+              <label class="block text-sm font-semibold text-slate-700">ソースコード</label>
+              <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
+                  <button type="button" id="btn-copy-html" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="表示中のコードをコピー">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                  </button>
+                  <button type="button" id="btn-clear-code" class="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="すべてクリア">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <div class="w-px h-4 bg-slate-300 mx-1"></div>
+                <div class="flex bg-slate-200/80 rounded-lg p-1 gap-1">
+                  <button type="button" id="btn-type-html" class="px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all">HTML</button>
+                  <button type="button" id="btn-type-react" class="px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all">React (JSX)</button>
+                </div>
+              </div>
+            </div>
+            <textarea id="editor-html" class="w-full flex-1 font-mono text-sm px-4 py-4 bg-slate-900 text-slate-100 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none leading-relaxed shadow-inner transition-colors" spellcheck="false"></textarea>
           </div>
         </div>
       </div>
       <div class="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
-        <button id="btn-cancel-editor" class="px-6 py-2.5 text-slate-600 hover:bg-slate-100 border rounded-xl font-medium">キャンセル</button>
-        <button id="btn-save-editor" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200">保存して登録</button>
+        <button id="btn-cancel-editor" class="px-6 py-2.5 text-slate-600 hover:bg-slate-100 border rounded-xl font-medium transition-colors">キャンセル</button>
+        <button id="btn-save-editor" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2">
+          <span id="save-editor-text">保存して登録</span>
+          <i id="save-editor-loader" data-lucide="loader-2" class="w-4 h-4 animate-spin hidden"></i>
+        </button>
       </div>
     </div>
   </div>
@@ -203,7 +236,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.2.3</span>
+            <span class="font-mono text-slate-800">1.3.1</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -236,7 +269,7 @@
     </div>
   </div>
 
-  <!-- 確認モーダル -->
+  <!-- 確認・アラートモーダル -->
   <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[120] items-center justify-center p-4 hidden animate-fade-in">
     <div class="bg-white p-6 rounded-3xl shadow-xl max-w-sm w-full animate-zoom-in">
       <h3 id="confirm-title" class="text-lg font-bold text-slate-800 mb-2"></h3>
@@ -245,6 +278,18 @@
         <button id="btn-confirm-cancel" class="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg">キャンセル</button>
         <button id="btn-confirm-ok" class="px-4 py-2 bg-red-600 text-white rounded-lg">削除する</button>
       </div>
+    </div>
+  </div>
+
+  <div id="alert-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[130] items-center justify-center p-4 hidden animate-fade-in">
+    <div class="bg-white p-6 rounded-3xl shadow-xl max-w-sm w-full text-center animate-zoom-in">
+      <div class="mx-auto w-12 h-12 bg-indigo-100 text-indigo-500 rounded-full flex items-center justify-center mb-4">
+        <i data-lucide="info" class="w-7 h-7"></i>
+      </div>
+      <p id="alert-msg" class="text-slate-800 font-medium mb-6 leading-relaxed whitespace-pre-wrap"></p>
+      <button id="btn-alert-ok" class="w-full py-2.5 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors">
+        確認
+      </button>
     </div>
   </div>
 
@@ -264,13 +309,59 @@
     let openAppIds = []; 
     let activeTabId = 'home';
     let sortOption = 'date-asc';
+    
+    // エディタ状態管理
     let currentEditingAppId = null;
     let currentImageUrl = '';
+    let currentCodeType = 'html'; 
+    
+    // 編集中のコードや、登録済みの種類を追跡する
+    let editorDraftHtml = '';
+    let editorDraftReact = '';
+    let originalAppCodeType = null;
+
     let importPendingData = null;
     let confirmCallback = null;
     
     // 設定
     let tabDisplayMode = 'full'; 
+
+    // --- デフォルトコード ---
+    const htmlDefaultCode = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>New App</title>
+  <style>
+    body { font-family: sans-serif; display: grid; place-items: center; height: 100vh; margin: 0; background-color: #f8fafc; }
+    h1 { color: #334155; }
+  </style>
+</head>
+<body>
+  <h1>Hello World</h1>
+</body>
+</html>`;
+
+    const reactDefaultCode = `import React, { useState } from 'react';
+import { Play } from 'lucide-react';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div className="flex flex-col h-screen items-center justify-center bg-slate-50 gap-4">
+      <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
+        <Play className="text-indigo-500" /> React App
+      </h1>
+      <button 
+        onClick={() => setCount(c => c + 1)}
+        className="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition font-bold"
+      >
+        Count is: {count}
+      </button>
+    </div>
+  );
+}`;
 
     // --- DOM要素 ---
     const gridContainer = document.getElementById('app-grid');
@@ -283,6 +374,12 @@
     const settingsModal = document.getElementById('settings-modal');
     const homeTools = document.getElementById('home-tools');
     const runnerTools = document.getElementById('runner-tools');
+    const btnTypeHtml = document.getElementById('btn-type-html');
+    const btnTypeReact = document.getElementById('btn-type-react');
+    const nameInput = document.getElementById('editor-name');
+    const htmlInput = document.getElementById('editor-html');
+    const urlInput = document.getElementById('editor-image-url');
+    const previewArea = document.getElementById('editor-image-preview');
 
     // --- モーダル制御ヘルパー ---
     const openModal = (modal) => {
@@ -292,6 +389,14 @@
     const closeModal = (modal) => {
       modal.classList.remove('flex');
       modal.classList.add('hidden');
+    };
+
+    function showAlert(msg) {
+      document.getElementById('alert-msg').textContent = msg;
+      openModal(document.getElementById('alert-modal'));
+    }
+    document.getElementById('btn-alert-ok').onclick = () => {
+      closeModal(document.getElementById('alert-modal'));
     };
 
     // --- ユーティリティ ---
@@ -316,7 +421,15 @@
     function init() {
       const savedData = localStorage.getItem('webapp_hub_data');
       if (savedData) {
-        try { apps = JSON.parse(savedData); } catch (e) { console.error('Data error'); }
+        try { 
+            const parsed = JSON.parse(savedData); 
+            apps = parsed.map(app => ({
+                ...app,
+                codeType: app.codeType || 'html',
+                sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
+                history: app.history || []
+            }));
+        } catch (e) { console.error('Data error'); }
       }
       const savedSort = localStorage.getItem('webapp_hub_sort');
       if (savedSort) {
@@ -377,7 +490,12 @@
           : app.name.substring(0, 2).toUpperCase();
         const bgClass = app.imageUrl ? 'bg-slate-50' : `bg-gradient-to-br ${getColorFromName(app.name)} text-white`;
 
+        const badge = app.codeType === 'react' 
+            ? `<div class="absolute top-3 left-3 bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm z-10"><i data-lucide="file-json" class="w-2.5 h-2.5 inline mr-0.5"></i>React</div>`
+            : '';
+
         tile.innerHTML = `
+          ${badge}
           <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <button class="btn-edit p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-blue-600 border border-slate-100 shadow-sm"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
             <button class="btn-delete p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-red-600 border border-slate-100 shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
@@ -466,7 +584,7 @@
         openAppIds.push(id);
         const iframe = document.createElement('iframe');
         iframe.id = `iframe-${id}`;
-        iframe.className = "absolute inset-0 w-full h-full border-none hidden";
+        iframe.className = "absolute inset-0 w-full h-full border-none hidden bg-white";
         iframe.sandbox = "allow-scripts allow-forms allow-modals allow-downloads allow-same-origin";
         iframe.srcdoc = injectStorageShim(id, app.html);
         iframeManager.appendChild(iframe);
@@ -500,7 +618,7 @@
     }
 
     function injectStorageShim(appId, html) {
-      return `<script>
+      const shim = `<script>
         (function() {
           const appId = "${appId}";
           const prefix = "webapp_hub_scoped_" + appId + "_";
@@ -518,25 +636,197 @@
           };
           Object.defineProperty(window, 'localStorage', { get: () => scopedLS, configurable: true });
         })();
-      <\/script>` + html;
+      <\/script>`;
+      
+      if (html.includes('<head>')) {
+        return html.replace('<head>', '<head>\n' + shim);
+      }
+      return shim + '\n' + html;
     }
 
-    // --- エディタ関連 ---
-    const nameInput = document.getElementById('editor-name');
-    const htmlInput = document.getElementById('editor-html');
-    const urlInput = document.getElementById('editor-image-url');
-    const previewArea = document.getElementById('editor-image-preview');
+    // --- React to HTML 変換エンジン ---
+    function parseLucideIcons(source) {
+        const iconMap = [];
+        const lucideImportRegex = /import\s+{([\s\S]+?)}\s+from\s+['"]lucide-react['"]/g;
+        let match;
+        while ((match = lucideImportRegex.exec(source)) !== null) {
+            const parts = match[1].split(',');
+            parts.forEach(part => {
+                const cleanPart = part.trim();
+                if (!cleanPart) return;
+                
+                if (cleanPart.includes(' as ')) {
+                    const [original, alias] = cleanPart.split(/\s+as\s+/);
+                    iconMap.push({ original: original.trim(), alias: alias.trim() });
+                } else {
+                    iconMap.push({ original: cleanPart, alias: cleanPart });
+                }
+            });
+        }
+        return iconMap;
+    }
+
+    function generateReactHTML(source, appName) {
+        const iconMap = parseLucideIcons(source);
+        const iconShims = iconMap.map(icon => 
+            `const ${icon.alias} = (props) => <Icon name="${icon.original}" {...props} />;`
+        ).join('\n        ');
+
+        let processedCode = source.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '');
+        
+        let mainComponentName = "App";
+        const exportMatch = source.match(/export\s+default\s+(?:function\s+([A-Za-z0-9_]+)|([A-Za-z0-9_]+))/);
+        if (exportMatch) {
+            mainComponentName = exportMatch[1] || exportMatch[2];
+        }
+
+        processedCode = processedCode.replace(/export\s+default\s+function/g, 'function');
+        processedCode = processedCode.replace(/export\s+default\s+/g, `const ${mainComponentName} = `);
+
+        return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>${escapeHTML(appName)}</title>
+    <!-- Dependencies -->
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+    <script src="https://unpkg.com/lucide@latest"><\/script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        * { -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback, useMemo } = React;
+
+        const Icon = ({ name, size = 24, strokeWidth = 2, className = "", color = "currentColor", ...props }) => {
+            const [svgContent, setSvgContent] = useState("");
+            
+            useEffect(() => {
+                if (window.lucide) {
+                    const kebabName = name
+                        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+                        .replace(/([a-zA-Z])([0-9])/g, '$1-$2')
+                        .toLowerCase();
+                    const temp = document.createElement('div');
+                    temp.innerHTML = '<i data-lucide="' + kebabName + '"></i>';
+                    window.lucide.createIcons({ root: temp });
+                    const svgNode = temp.querySelector('svg');
+                    if (svgNode) {
+                        setSvgContent(svgNode.innerHTML);
+                    }
+                }
+            }, [name]);
+
+            return (
+                <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width={size} 
+                    height={size} 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke={color} 
+                    strokeWidth={strokeWidth} 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className={className} 
+                    {...props}
+                    dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+            );
+        };
+
+        ${iconShims}
+
+        ${processedCode}
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<${mainComponentName} />);
+    <\/script>
+</body>
+</html>`;
+    }
+
+    // --- エディタ関連ロジック ---
+    function setCodeTypeUI(type) {
+        // 現在の入力を下書きに保存する
+        if (currentCodeType === 'html' && originalAppCodeType !== 'react') {
+            editorDraftHtml = htmlInput.value;
+        } else if (currentCodeType === 'react') {
+            editorDraftReact = htmlInput.value;
+        }
+
+        currentCodeType = type;
+        
+        if (type === 'html') {
+            btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all";
+            btnTypeReact.className = "px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all";
+            
+            htmlInput.value = editorDraftHtml;
+
+            // Reactとして登録済みの場合は、HTMLは変換結果として扱いリードオンリーにする
+            if (originalAppCodeType === 'react') {
+                htmlInput.readOnly = true;
+                htmlInput.classList.add('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.remove('bg-slate-900', 'text-slate-100');
+            } else {
+                htmlInput.readOnly = false;
+                htmlInput.classList.remove('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.add('bg-slate-900', 'text-slate-100');
+            }
+        } else {
+            btnTypeReact.className = "px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all";
+            btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all";
+            
+            htmlInput.value = editorDraftReact;
+            htmlInput.readOnly = false;
+            
+            // Reactタブは常に編集可能
+            htmlInput.classList.remove('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+            htmlInput.classList.add('bg-slate-900', 'text-slate-100');
+        }
+    }
+
+    btnTypeHtml.onclick = () => { if (currentCodeType !== 'html') setCodeTypeUI('html'); };
+    btnTypeReact.onclick = () => { if (currentCodeType !== 'react') setCodeTypeUI('react'); };
 
     function openEditor(app = null) {
       currentEditingAppId = app?.id || null;
       nameInput.value = app?.name || '';
-      htmlInput.value = app?.html || '<!DOCTYPE html><html><head><style>body{font-family:sans-serif;display:grid;place-items:center;height:100vh;margin:0;}</style></head><body><h1>Hello World</h1></body></html>';
+      
+      if (app) {
+          originalAppCodeType = app.codeType || 'html';
+          editorDraftHtml = app.html || '';
+          editorDraftReact = app.sourceCode || '';
+          
+          currentCodeType = ''; // 強制更新のため一度リセット
+          setCodeTypeUI(originalAppCodeType);
+      } else {
+          originalAppCodeType = null;
+          editorDraftHtml = htmlDefaultCode;
+          editorDraftReact = reactDefaultCode;
+          
+          currentCodeType = ''; // 強制更新のため一度リセット
+          setCodeTypeUI('html');
+      }
+
       currentImageUrl = app?.imageUrl || '';
       urlInput.value = currentImageUrl;
       
       document.getElementById('editor-title').textContent = app ? 'アプリを編集' : '新規アプリを登録';
       updateImagePreviewUI();
+      renderHistory(app);
       openModal(editorModal);
+      lucide.createIcons({ root: editorModal });
     }
 
     function updateImagePreviewUI() {
@@ -551,21 +841,143 @@
       lucide.createIcons({ root: previewArea });
     }
 
-    document.getElementById('btn-save-editor').onclick = () => {
-      const name = nameInput.value.trim();
-      const html = htmlInput.value.trim();
-      if (!name || !html) return;
-
-      if (currentEditingAppId) {
-        apps = apps.map(a => a.id === currentEditingAppId ? { ...a, name, html, imageUrl: currentImageUrl } : a);
-        const iframe = document.getElementById(`iframe-${currentEditingAppId}`);
-        if (iframe) iframe.srcdoc = injectStorageShim(currentEditingAppId, html);
-      } else {
-        apps.push({ id: generateId(), name, html, imageUrl: currentImageUrl, createdAt: Date.now() });
+    function renderHistory(app) {
+      const section = document.getElementById('editor-history-section');
+      const list = document.getElementById('editor-history-list');
+      list.innerHTML = '';
+      
+      if (!app || !app.history || app.history.length === 0) {
+        section.classList.add('hidden');
+        return;
       }
-      saveData();
-      renderGrid();
-      closeModal(editorModal);
+      section.classList.remove('hidden');
+      
+      [...app.history].reverse().forEach(h => {
+        const d = new Date(h.timestamp);
+        const li = document.createElement('li');
+        li.className = "flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 border border-transparent hover:border-slate-200 text-sm transition-colors";
+        li.innerHTML = `
+          <div class="flex flex-col">
+            <span class="font-medium text-slate-700">${d.toLocaleString()}</span>
+            <span class="text-[10px] text-slate-500 font-bold tracking-wider">${h.codeType === 'react' ? 'REACT' : 'HTML'}</span>
+          </div>
+          <button class="btn-restore px-3 py-1 bg-white border border-slate-300 rounded shadow-sm text-xs text-indigo-600 hover:bg-indigo-50 font-bold transition-colors">復元</button>
+        `;
+        li.querySelector('.btn-restore').onclick = () => {
+          nameInput.value = h.name || '';
+          currentImageUrl = h.imageUrl || '';
+          urlInput.value = currentImageUrl;
+          
+          originalAppCodeType = h.codeType || 'html';
+          editorDraftHtml = h.html || '';
+          editorDraftReact = h.sourceCode || h.html || '';
+          
+          currentCodeType = ''; 
+          setCodeTypeUI(originalAppCodeType);
+          
+          updateImagePreviewUI();
+          showAlert('過去のバージョンをエディタに復元しました。\n「保存して登録」を押すと新しいバージョンとして保存されます。');
+        };
+        list.appendChild(li);
+      });
+    }
+
+    document.getElementById('btn-copy-html').onclick = () => {
+      const sourceCode = htmlInput.value;
+      if (!sourceCode) return;
+      
+      const ta = document.createElement('textarea');
+      ta.value = sourceCode;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      
+      showAlert(currentCodeType === 'react' ? 'Reactソースコードをコピーしました！' : 'HTMLコードをコピーしました！');
+    };
+
+    document.getElementById('btn-clear-code').onclick = () => {
+      if (htmlInput.readOnly) {
+          showAlert('変換済みのHTMLは直接編集（クリア）できません。\nReactタブからソースコードを編集してください。');
+          return;
+      }
+      htmlInput.value = '';
+      htmlInput.focus();
+    };
+
+    document.getElementById('btn-save-editor').onclick = () => {
+      // 登録時の状態を更新する
+      if (currentCodeType === 'html' && originalAppCodeType !== 'react') {
+          editorDraftHtml = htmlInput.value;
+      } else if (currentCodeType === 'react') {
+          editorDraftReact = htmlInput.value;
+      }
+
+      const name = nameInput.value.trim();
+      
+      // 元々Reactで登録されたアプリならHTMLタブを開いたまま保存してもReact扱いにする
+      const saveCodeType = (originalAppCodeType === 'react') ? 'react' : currentCodeType;
+      const sourceCode = (saveCodeType === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
+
+      if (!name || !sourceCode) return;
+
+      const saveBtn = document.getElementById('btn-save-editor');
+      const saveText = document.getElementById('save-editor-text');
+      const saveLoader = document.getElementById('save-editor-loader');
+      
+      saveBtn.disabled = true;
+      saveText.textContent = "変換・保存中...";
+      saveLoader.classList.remove('hidden');
+
+      setTimeout(() => {
+        let runnableHtml = sourceCode;
+        
+        if (saveCodeType === 'react') {
+            try {
+                runnableHtml = generateReactHTML(sourceCode, name);
+            } catch (err) {
+                console.error(err);
+                showAlert('Reactコードの解析に失敗しました。JSXの構文が正しいか確認してください。');
+                saveBtn.disabled = false;
+                saveText.textContent = "保存して登録";
+                saveLoader.classList.add('hidden');
+                return;
+            }
+        }
+
+        const historyItem = {
+            timestamp: Date.now(),
+            name: name,
+            codeType: saveCodeType,
+            sourceCode: sourceCode,
+            html: runnableHtml,
+            imageUrl: currentImageUrl
+        };
+
+        if (currentEditingAppId) {
+          const app = apps.find(a => a.id === currentEditingAppId);
+          const newHistory = [...(app.history || []), historyItem].slice(-30); // 最大30件保持
+          
+          apps = apps.map(a => a.id === currentEditingAppId ? { 
+            ...a, name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, history: newHistory 
+          } : a);
+          
+          const iframe = document.getElementById(`iframe-${currentEditingAppId}`);
+          if (iframe) iframe.srcdoc = injectStorageShim(currentEditingAppId, runnableHtml);
+        } else {
+          apps.push({ 
+            id: generateId(), name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, createdAt: Date.now(), history: [historyItem]
+          });
+        }
+        
+        saveData();
+        renderGrid();
+        closeModal(editorModal);
+
+        saveBtn.disabled = false;
+        saveText.textContent = "保存して登録";
+        saveLoader.classList.add('hidden');
+      }, 50);
     };
 
     function processImage(file) {
@@ -647,7 +1059,6 @@
     let dragCounter = 0;
 
     window.addEventListener('dragenter', (e) => {
-      // アプリ実行中（ホーム以外のタブが開いている時）は反応させない
       if (activeTabId !== 'home') return; 
       e.preventDefault();
       if (e.dataTransfer.types.includes('Files')) {
@@ -683,7 +1094,7 @@
         if (file.name.endsWith('.html')) {
           const reader = new FileReader();
           reader.onload = (ev) => {
-            apps.push({ id: generateId(), name: file.name.replace(/\.html$/i, ''), html: ev.target.result, imageUrl: '', createdAt: Date.now() });
+            apps.push({ id: generateId(), name: file.name.replace(/\.html$/i, ''), codeType: 'html', sourceCode: ev.target.result, html: ev.target.result, imageUrl: '', createdAt: Date.now() });
             saveData(); renderGrid();
           };
           reader.readAsText(file);
@@ -708,10 +1119,17 @@
         try {
           const data = JSON.parse(ev.target.result);
           if (!Array.isArray(data)) throw new Error();
-          importPendingData = data;
+          
+          importPendingData = data.map(app => ({
+              ...app,
+              codeType: app.codeType || 'html',
+              sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
+              history: app.history || []
+          }));
+
           document.getElementById('import-msg').textContent = `${data.length} 件のデータが見つかりました。`;
           openModal(document.getElementById('import-modal'));
-        } catch(e) { alert('不正なファイルです'); }
+        } catch(e) { showAlert('不正なファイルです。JSON形式であるか確認してください。'); }
       };
       reader.readAsText(file);
     };
