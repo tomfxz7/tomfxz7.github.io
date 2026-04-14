@@ -196,6 +196,21 @@
                 </div>
               </div>
             </div>
+            
+            <!-- GitHubインポートUI -->
+            <div class="flex gap-2 mb-2 items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+              <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500">
+                  <i data-lucide="github" class="w-4 h-4"></i>
+                </div>
+                <input type="text" id="github-url-input" placeholder="GitHubのファイルURLをペースト..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-shadow" />
+              </div>
+              <button type="button" id="btn-fetch-github" class="px-3 py-1.5 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors shrink-0 flex items-center gap-1 shadow-sm">
+                <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                取得
+              </button>
+            </div>
+
             <textarea id="editor-html" class="w-full flex-1 font-mono text-sm px-4 py-4 bg-slate-900 text-slate-100 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none leading-relaxed shadow-inner transition-colors" spellcheck="false"></textarea>
           </div>
         </div>
@@ -1009,6 +1024,57 @@ export default function App() {
       }
       htmlInput.value = '';
       htmlInput.focus();
+    };
+
+    // GitHubからのコード取得
+    document.getElementById('btn-fetch-github').onclick = async () => {
+      const urlInput = document.getElementById('github-url-input');
+      let url = urlInput.value.trim();
+      if (!url) {
+        showAlert('GitHubのファイルURLを入力してください。');
+        return;
+      }
+
+      // GitHubの通常URLをRaw URLに変換
+      if (url.startsWith('https://github.com/')) {
+        url = url.replace('https://github.com/', 'https://raw.githubusercontent.com/').replace('/blob/', '/');
+      }
+
+      const btn = document.getElementById('btn-fetch-github');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
+      btn.disabled = true;
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
+        const text = await response.text();
+
+        // 拡張子からコードのタイプを推測
+        const isReact = url.match(/\.(jsx|tsx|js)$/i);
+        setCodeTypeUI(isReact ? 'react' : 'html');
+        
+        // 取得したコードをエディタに反映
+        htmlInput.value = text;
+        if (currentCodeType === 'html') editorDraftHtml = text;
+        if (currentCodeType === 'react') editorDraftReact = text;
+
+        // アプリ名が空ならファイル名から自動設定
+        if (!nameInput.value.trim()) {
+          const fileName = url.split('/').pop().split('.')[0];
+          nameInput.value = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+        }
+
+        showAlert('GitHubからソースコードを取得しました！');
+        urlInput.value = ''; // 入力欄をクリア
+      } catch (err) {
+        console.error(err);
+        showAlert('ファイルの取得に失敗しました。\nURLが正しいか、公開リポジトリであるか確認してください。\n\n詳細: ' + err.message);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        lucide.createIcons({ root: btn.parentElement });
+      }
     };
 
     document.getElementById('btn-save-editor').onclick = async () => {
