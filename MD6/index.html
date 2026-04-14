@@ -251,7 +251,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.6.0</span>
+            <span class="font-mono text-slate-800">1.7.0</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -393,6 +393,7 @@
     let currentEditingAppId = null;
     let currentImageUrl = '';
     let currentCodeType = 'html'; 
+    let currentGithubUrl = '';
     
     // 編集中のコードや、登録済みの種類を追跡する
     let editorDraftHtml = '';
@@ -601,9 +602,12 @@ export default function App() {
             ? `<div class="absolute top-3 left-3 bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm z-10"><i data-lucide="file-json" class="w-2.5 h-2.5 inline mr-0.5"></i>React</div>`
             : '';
 
+        const btnSync = app.githubUrl ? `<button class="btn-sync p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-green-600 border border-slate-100 shadow-sm" title="GitHubから最新のコードに更新"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>` : '';
+
         tile.innerHTML = `
           ${badge}
           <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            ${btnSync}
             <button class="btn-edit p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-blue-600 border border-slate-100 shadow-sm"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
             <button class="btn-delete p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-red-600 border border-slate-100 shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
           </div>
@@ -612,6 +616,63 @@ export default function App() {
           </div>
           <h3 class="font-bold text-slate-800 text-center w-full truncate px-2 text-xs sm:text-sm">${escapeHTML(app.name)}</h3>
         `;
+
+        if (app.githubUrl) {
+          tile.querySelector('.btn-sync').onclick = async (e) => {
+            e.stopPropagation();
+            const btn = e.currentTarget;
+            const icon = btn.querySelector('i');
+            if (icon.classList.contains('animate-spin')) return;
+            icon.classList.add('animate-spin');
+
+            try {
+                let rawUrl = app.githubUrl;
+                try {
+                    const urlObj = new URL(rawUrl);
+                    urlObj.search = ''; urlObj.hash = '';
+                    if (urlObj.hostname === 'github.com') {
+                        const parts = urlObj.pathname.split('/');
+                        if (parts[3] === 'blob' || parts[3] === 'raw') {
+                            parts.splice(3, 1);
+                            urlObj.hostname = 'raw.githubusercontent.com';
+                            urlObj.pathname = parts.join('/');
+                        }
+                    }
+                    rawUrl = urlObj.toString();
+                } catch(e) {}
+
+                const response = await fetch(rawUrl);
+                if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
+                const text = await response.text();
+
+                let codeType = app.codeType;
+                let runnableHtml = text;
+
+                if (codeType === 'react' || rawUrl.match(/\.(jsx|tsx|js)$/i)) {
+                    codeType = 'react';
+                    runnableHtml = generateReactHTML(text, app.name);
+                }
+
+                const historyItem = { timestamp: Date.now(), name: app.name, codeType: codeType, sourceCode: text, imageUrl: app.imageUrl };
+                const newHistory = [...(app.history || []), historyItem].slice(-10);
+
+                const updatedApp = { ...app, codeType, sourceCode: text, html: runnableHtml, history: newHistory };
+                apps = apps.map(a => a.id === app.id ? updatedApp : a);
+                
+                await saveData();
+
+                const iframe = document.getElementById(`iframe-${app.id}`);
+                if (iframe) iframe.srcdoc = injectStorageShim(app.id, runnableHtml);
+
+                renderGrid();
+                showAlert('GitHubから最新のコードに更新しました！');
+            } catch(err) {
+                console.error(err);
+                showAlert('更新に失敗しました。\n' + err.message);
+                icon.classList.remove('animate-spin');
+            }
+          };
+        }
 
         tile.querySelector('.btn-edit').onclick = (e) => { e.stopPropagation(); openEditor(app); };
         tile.querySelector('.btn-delete').onclick = (e) => { e.stopPropagation(); requestDelete(app); };
@@ -879,13 +940,14 @@ export default function App() {
     // --- エディタ関連ロジック ---
     function setCodeTypeUI(type) {
         // 現在の入力を下書きに保存する
-        if (currentCodeType === 'html' && originalAppCodeType !== 'react') {
+        if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
             editorDraftHtml = htmlInput.value;
-        } else if (currentCodeType === 'react') {
+        } else if (currentCodeType === 'react' && !currentGithubUrl) {
             editorDraftReact = htmlInput.value;
         }
 
         currentCodeType = type;
+        const isLinked = !!currentGithubUrl;
         
         if (type === 'html') {
             btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all";
@@ -894,7 +956,7 @@ export default function App() {
             htmlInput.value = editorDraftHtml;
 
             // Reactとして登録済みの場合は、HTMLは変換結果として扱いリードオンリーにする
-            if (originalAppCodeType === 'react') {
+            if (originalAppCodeType === 'react' || isLinked) {
                 htmlInput.readOnly = true;
                 htmlInput.classList.add('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
                 htmlInput.classList.remove('bg-slate-900', 'text-slate-100');
@@ -908,11 +970,16 @@ export default function App() {
             btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all";
             
             htmlInput.value = editorDraftReact;
-            htmlInput.readOnly = false;
             
-            // Reactタブは常に編集可能
-            htmlInput.classList.remove('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
-            htmlInput.classList.add('bg-slate-900', 'text-slate-100');
+            if (isLinked) {
+                htmlInput.readOnly = true;
+                htmlInput.classList.add('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.remove('bg-slate-900', 'text-slate-100');
+            } else {
+                htmlInput.readOnly = false;
+                htmlInput.classList.remove('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
+                htmlInput.classList.add('bg-slate-900', 'text-slate-100');
+            }
         }
     }
 
@@ -923,10 +990,14 @@ export default function App() {
       currentEditingAppId = app?.id || null;
       nameInput.value = app?.name || '';
       
+      const ghInput = document.getElementById('github-url-input');
+      const ghBtn = document.getElementById('btn-fetch-github');
+
       if (app) {
           originalAppCodeType = app.codeType || 'html';
           editorDraftHtml = app.html || '';
           editorDraftReact = app.sourceCode || '';
+          currentGithubUrl = app.githubUrl || '';
           
           currentCodeType = ''; // 強制更新のため一度リセット
           setCodeTypeUI(originalAppCodeType);
@@ -934,9 +1005,22 @@ export default function App() {
           originalAppCodeType = null;
           editorDraftHtml = htmlDefaultCode;
           editorDraftReact = reactDefaultCode;
+          currentGithubUrl = '';
           
           currentCodeType = ''; // 強制更新のため一度リセット
           setCodeTypeUI('html');
+      }
+
+      if (currentGithubUrl) {
+          ghInput.value = currentGithubUrl;
+          ghInput.readOnly = true;
+          ghInput.classList.add('bg-slate-100', 'text-slate-500');
+          ghBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新';
+      } else {
+          ghInput.value = '';
+          ghInput.readOnly = false;
+          ghInput.classList.remove('bg-slate-100', 'text-slate-500');
+          ghBtn.innerHTML = '<i data-lucide="download-cloud" class="w-4 h-4"></i>取得';
       }
 
       currentImageUrl = app?.imageUrl || '';
@@ -997,7 +1081,16 @@ export default function App() {
           setCodeTypeUI(originalAppCodeType);
           
           updateImagePreviewUI();
-          showAlert('過去のバージョンをエディタに復元しました。\n「保存して登録」を押すと新しいバージョンとして保存されます。');
+          showAlert('過去のバージョンをエディタに復元しました。\n「保存して登録」を押すと新しいバージョンとして保存されます。\n※GitHub連携は解除されます。');
+          
+          // 復元時はGitHub連携を一旦解除する（ユーザーが手動でいじれるように）
+          currentGithubUrl = '';
+          const ghInput = document.getElementById('github-url-input');
+          ghInput.value = '';
+          ghInput.readOnly = false;
+          ghInput.classList.remove('bg-slate-100', 'text-slate-500');
+          document.getElementById('btn-fetch-github').innerHTML = '<i data-lucide="download-cloud" class="w-4 h-4"></i>取得';
+          setCodeTypeUI(originalAppCodeType);
         };
         list.appendChild(li);
       });
@@ -1019,7 +1112,7 @@ export default function App() {
 
     document.getElementById('btn-clear-code').onclick = () => {
       if (htmlInput.readOnly) {
-          showAlert('変換済みのHTMLは直接編集（クリア）できません。\nReactタブからソースコードを編集してください。');
+          showAlert(currentGithubUrl ? 'GitHub連携されているためソースコードはクリアできません。' : '変換済みのHTMLは直接編集（クリア）できません。\nReactタブからソースコードを編集してください。');
           return;
       }
       htmlInput.value = '';
@@ -1068,27 +1161,43 @@ export default function App() {
         const text = await response.text();
 
         // 拡張子からコードのタイプを推測
+        const originalUrl = urlInput.value.trim();
         const isReact = url.match(/\.(jsx|tsx|js)$/i);
-        setCodeTypeUI(isReact ? 'react' : 'html');
-        
-        // 取得したコードをエディタに反映
-        htmlInput.value = text;
-        if (currentCodeType === 'html') editorDraftHtml = text;
-        if (currentCodeType === 'react') editorDraftReact = text;
+        currentGithubUrl = originalUrl;
+        originalAppCodeType = isReact ? 'react' : 'html';
 
+        if (isReact) {
+            editorDraftReact = text;
+            try {
+                editorDraftHtml = generateReactHTML(text, nameInput.value.trim() || 'App');
+            } catch(e) {
+                editorDraftHtml = "<!-- React Parse Error -->";
+            }
+        } else {
+            editorDraftHtml = text;
+            editorDraftReact = '';
+        }
+
+        setCodeTypeUI(originalAppCodeType);
+        
         // アプリ名が空ならファイル名から自動設定
         if (!nameInput.value.trim()) {
-          const fileName = url.split('/').pop().split('.')[0];
+          let fileName = originalUrl.split('/').pop().split('.')[0];
+          if(fileName.includes('?')) fileName = fileName.split('?')[0];
+          if(fileName.includes('#')) fileName = fileName.split('#')[0];
           nameInput.value = fileName.charAt(0).toUpperCase() + fileName.slice(1);
         }
 
-        showAlert('GitHubからソースコードを取得しました！');
-        urlInput.value = ''; // 入力欄をクリア
+        urlInput.readOnly = true;
+        urlInput.classList.add('bg-slate-100', 'text-slate-500');
+        btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新';
+
+        showAlert('GitHubから最新のソースコードを取得しました！');
       } catch (err) {
         console.error(err);
         showAlert('ファイルの取得に失敗しました。\nURLが正しいか、公開リポジトリであるか確認してください。\n\n詳細: ' + err.message);
-      } finally {
         btn.innerHTML = originalText;
+      } finally {
         btn.disabled = false;
         lucide.createIcons({ root: btn.parentElement });
       }
@@ -1096,9 +1205,9 @@ export default function App() {
 
     document.getElementById('btn-save-editor').onclick = async () => {
       // 登録時の状態を更新する
-      if (currentCodeType === 'html' && originalAppCodeType !== 'react') {
+      if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
           editorDraftHtml = htmlInput.value;
-      } else if (currentCodeType === 'react') {
+      } else if (currentCodeType === 'react' && !currentGithubUrl) {
           editorDraftReact = htmlInput.value;
       }
 
@@ -1144,12 +1253,12 @@ export default function App() {
               const newHistory = [...(app.history || []), historyItem].slice(-10); 
               
               newApps = newApps.map(a => a.id === currentEditingAppId ? { 
-                ...a, name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, history: newHistory 
+                ...a, name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, history: newHistory, githubUrl: currentGithubUrl 
               } : a);
               
             } else {
               newApps.push({ 
-                id: generateId(), name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, createdAt: Date.now(), history: [historyItem]
+                id: generateId(), name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, createdAt: Date.now(), history: [historyItem], githubUrl: currentGithubUrl
               });
             }
             
@@ -1359,7 +1468,8 @@ export default function App() {
               ...app,
               codeType: app.codeType || 'html',
               sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
-              history: app.history || []
+              history: app.history || [],
+              githubUrl: app.githubUrl || ''
           }));
 
           document.getElementById('import-msg').textContent = `${data.length} 件のデータが見つかりました。`;
