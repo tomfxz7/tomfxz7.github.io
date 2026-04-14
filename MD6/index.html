@@ -196,7 +196,7 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- GitHubインポートUI -->
             <div class="flex gap-2 mb-2 items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200">
               <div class="relative flex-1">
@@ -251,7 +251,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.7.0</span>
+            <span class="font-mono text-slate-800">1.8.0</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -406,6 +406,96 @@
     // 設定
     let tabDisplayMode = 'full'; 
 
+    // --- GitHub 同期共通ロジック ---
+    async function syncGithubCode(appId, iconElement = null) {
+        const app = apps.find(a => a.id === appId);
+        if (!app || !app.githubUrl) return;
+
+        if (iconElement) iconElement.classList.add('animate-spin');
+
+        try {
+            // エディタの「取得」と同じ堅牢なURLパース
+            let url = app.githubUrl;
+            try {
+                const urlObj = new URL(url);
+                urlObj.search = ''; urlObj.hash = '';
+                if (urlObj.hostname === 'github.com') {
+                    const parts = urlObj.pathname.split('/');
+                    if (parts[3] === 'blob' || parts[3] === 'raw') {
+                        parts.splice(3, 1);
+                        urlObj.hostname = 'raw.githubusercontent.com';
+                        urlObj.pathname = parts.join('/');
+                    }
+                }
+                url = urlObj.toString();
+            } catch (e) {}
+
+            let fetchUrl = url;
+            try {
+                const u = new URL(url);
+                u.searchParams.set('_t', Date.now()); // キャッシュ回避
+                fetchUrl = u.toString();
+            } catch(e) {}
+
+            const response = await fetch(fetchUrl, { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
+            const sourceCode = await response.text();
+
+            // エディタの「保存して登録」と同じロジック
+            const isReact = url.match(/\.(jsx|tsx|js)$/i) || app.codeType === 'react';
+            const saveCodeType = isReact ? 'react' : 'html';
+            
+            let runnableHtml = sourceCode;
+            if (saveCodeType === 'react') {
+                try {
+                    runnableHtml = generateReactHTML(sourceCode, app.name);
+                } catch(e) {
+                    runnableHtml = "<!-- React Parse Error -->";
+                    console.error('React parse error during sync:', e);
+                }
+            }
+
+            const historyItem = {
+                timestamp: Date.now(),
+                name: app.name,
+                codeType: saveCodeType,
+                sourceCode: sourceCode,
+                imageUrl: app.imageUrl
+            };
+
+            const newHistory = [...(app.history || []), historyItem].slice(-10);
+
+            const updatedApp = { 
+                ...app, 
+                codeType: saveCodeType, 
+                sourceCode: sourceCode, 
+                html: runnableHtml, 
+                history: newHistory 
+            };
+
+            // 保存して画面に反映
+            apps = apps.map(a => a.id === app.id ? updatedApp : a);
+            await saveData();
+
+            const iframe = document.getElementById(`iframe-${app.id}`);
+            if (iframe) iframe.srcdoc = injectStorageShim(app.id, runnableHtml);
+
+            renderGrid();
+            showAlert('GitHubから最新のコードに同期しました！');
+
+            // もし編集画面を開いたまま同期した場合、エディタ上の表示も更新する
+            if (currentEditingAppId === app.id && !document.getElementById('editor-modal').classList.contains('hidden')) {
+                openEditor(updatedApp);
+            }
+
+        } catch(err) {
+            console.error(err);
+            showAlert('同期に失敗しました。\n' + err.message);
+        } finally {
+            if (iconElement) iconElement.classList.remove('animate-spin');
+        }
+    }
+
     // --- デフォルトコード ---
     const htmlDefaultCode = `<!DOCTYPE html>
 <html lang="ja">
@@ -520,7 +610,8 @@ export default function App() {
                 ...app,
                 codeType: app.codeType || 'html',
                 sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
-                history: app.history || []
+                history: app.history || [],
+                githubUrl: app.githubUrl || ''
             }));
         } catch (e) { console.error('Data error'); }
       }
@@ -618,59 +709,11 @@ export default function App() {
         `;
 
         if (app.githubUrl) {
-          tile.querySelector('.btn-sync').onclick = async (e) => {
+          tile.querySelector('.btn-sync').onclick = (e) => {
             e.stopPropagation();
-            const btn = e.currentTarget;
-            const icon = btn.querySelector('i');
+            const icon = e.currentTarget.querySelector('i');
             if (icon.classList.contains('animate-spin')) return;
-            icon.classList.add('animate-spin');
-
-            try {
-                let rawUrl = app.githubUrl;
-                try {
-                    const urlObj = new URL(rawUrl);
-                    urlObj.search = ''; urlObj.hash = '';
-                    if (urlObj.hostname === 'github.com') {
-                        const parts = urlObj.pathname.split('/');
-                        if (parts[3] === 'blob' || parts[3] === 'raw') {
-                            parts.splice(3, 1);
-                            urlObj.hostname = 'raw.githubusercontent.com';
-                            urlObj.pathname = parts.join('/');
-                        }
-                    }
-                    rawUrl = urlObj.toString();
-                } catch(e) {}
-
-                const response = await fetch(rawUrl);
-                if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
-                const text = await response.text();
-
-                let codeType = app.codeType;
-                let runnableHtml = text;
-
-                if (codeType === 'react' || rawUrl.match(/\.(jsx|tsx|js)$/i)) {
-                    codeType = 'react';
-                    runnableHtml = generateReactHTML(text, app.name);
-                }
-
-                const historyItem = { timestamp: Date.now(), name: app.name, codeType: codeType, sourceCode: text, imageUrl: app.imageUrl };
-                const newHistory = [...(app.history || []), historyItem].slice(-10);
-
-                const updatedApp = { ...app, codeType, sourceCode: text, html: runnableHtml, history: newHistory };
-                apps = apps.map(a => a.id === app.id ? updatedApp : a);
-                
-                await saveData();
-
-                const iframe = document.getElementById(`iframe-${app.id}`);
-                if (iframe) iframe.srcdoc = injectStorageShim(app.id, runnableHtml);
-
-                renderGrid();
-                showAlert('GitHubから最新のコードに更新しました！');
-            } catch(err) {
-                console.error(err);
-                showAlert('更新に失敗しました。\n' + err.message);
-                icon.classList.remove('animate-spin');
-            }
+            syncGithubCode(app.id, icon);
           };
         }
 
@@ -1119,8 +1162,22 @@ export default function App() {
       htmlInput.focus();
     };
 
-    // GitHubからのコード取得
+    // GitHubからのコード取得・更新
     document.getElementById('btn-fetch-github').onclick = async () => {
+      if (currentGithubUrl && currentEditingAppId) {
+          // すでに連携済みで編集画面から更新ボタンを押した場合は、共通同期ロジックを呼ぶ
+          const btn = document.getElementById('btn-fetch-github');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
+          btn.disabled = true;
+          await syncGithubCode(currentEditingAppId, null);
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          lucide.createIcons({ root: btn.parentElement });
+          return;
+      }
+
+      // 新規取得の場合の処理
       const urlInput = document.getElementById('github-url-input');
       let url = urlInput.value.trim();
       if (!url) {
@@ -1156,7 +1213,15 @@ export default function App() {
       btn.disabled = true;
 
       try {
-        const response = await fetch(url);
+        // キャッシュ回避のためにタイムスタンプを付与
+        let fetchUrl = url;
+        try {
+            const u = new URL(url);
+            u.searchParams.set('_t', Date.now());
+            fetchUrl = u.toString();
+        } catch(e) {}
+
+        const response = await fetch(fetchUrl, { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
         const text = await response.text();
 
