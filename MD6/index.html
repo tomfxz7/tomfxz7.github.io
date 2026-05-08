@@ -255,7 +255,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.8.5</span>
+            <span class="font-mono text-slate-800">1.8.6</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -294,6 +294,25 @@
           <div class="text-xs text-slate-500">現在のリストを消去して置き換えます。</div>
         </button>
         <button id="btn-import-cancel" class="w-full mt-2 p-3 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- エクスポート選択モーダル -->
+  <div id="export-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[115] items-center justify-center p-4 hidden animate-fade-in">
+    <div class="bg-white p-6 rounded-3xl shadow-xl max-w-lg w-full animate-zoom-in">
+      <h3 class="text-xl font-bold text-slate-800 mb-3">エクスポートするアプリを選択</h3>
+      <div class="flex items-center justify-between mb-3">
+        <label class="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input type="checkbox" id="export-select-all" class="w-4 h-4">
+          全選択
+        </label>
+        <span id="export-selected-count" class="text-xs text-slate-500">0件選択中</span>
+      </div>
+      <div id="export-app-list" class="max-h-72 overflow-y-auto border rounded-xl p-2 flex flex-col gap-1 bg-slate-50"></div>
+      <div class="flex gap-3 justify-end mt-4">
+        <button id="btn-export-cancel" class="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg">キャンセル</button>
+        <button id="btn-export-confirm" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">選択したアプリをエクスポート</button>
       </div>
     </div>
   </div>
@@ -1534,12 +1553,66 @@ export default function App() {
     });
 
     // インポート・エクスポート
+    function updateExportSelectedCount() {
+      const checked = document.querySelectorAll('.export-app-checkbox:checked').length;
+      document.getElementById('export-selected-count').textContent = `${checked}件選択中`;
+    }
+
+    function openExportModal() {
+      const list = document.getElementById('export-app-list');
+      const selectAll = document.getElementById('export-select-all');
+      list.innerHTML = '';
+
+      apps.forEach(app => {
+        const row = document.createElement('label');
+        row.className = 'flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white cursor-pointer';
+        row.innerHTML = `
+          <input type="checkbox" class="export-app-checkbox w-4 h-4" value="${app.id}" checked>
+          <span class="text-sm text-slate-700 truncate">${escapeHTML(app.name)}</span>
+        `;
+        list.appendChild(row);
+      });
+
+      selectAll.checked = true;
+      updateExportSelectedCount();
+
+      list.querySelectorAll('.export-app-checkbox').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const all = list.querySelectorAll('.export-app-checkbox');
+          const checked = list.querySelectorAll('.export-app-checkbox:checked');
+          selectAll.checked = all.length > 0 && all.length === checked.length;
+          updateExportSelectedCount();
+        });
+      });
+
+      openModal(document.getElementById('export-modal'));
+    }
+
     document.getElementById('btn-export').onclick = () => {
-      const blob = new Blob([JSON.stringify(apps, null, 2)], {type: 'application/json'});
+      if (apps.length === 0) {
+        showAlert('エクスポートできるアプリがありません。');
+        return;
+      }
+      openExportModal();
+    };
+    document.getElementById('export-select-all').onchange = (e) => {
+      document.querySelectorAll('.export-app-checkbox').forEach(cb => cb.checked = e.target.checked);
+      updateExportSelectedCount();
+    };
+    document.getElementById('btn-export-cancel').onclick = () => closeModal(document.getElementById('export-modal'));
+    document.getElementById('btn-export-confirm').onclick = () => {
+      const selectedIds = Array.from(document.querySelectorAll('.export-app-checkbox:checked')).map(cb => cb.value);
+      const selectedApps = apps.filter(app => selectedIds.includes(app.id));
+      if (selectedApps.length === 0) {
+        showAlert('エクスポートするアプリを1つ以上選択してください。');
+        return;
+      }
+      const blob = new Blob([JSON.stringify(selectedApps, null, 2)], {type: 'application/json'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `webapp_hub_backup_${new Date().toISOString().slice(0,10)}.json`;
       a.click();
+      closeModal(document.getElementById('export-modal'));
     };
     document.getElementById('btn-import').onclick = () => document.getElementById('import-file-input').click();
     document.getElementById('import-file-input').onchange = (e) => {
