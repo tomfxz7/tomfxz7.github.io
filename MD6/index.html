@@ -255,7 +255,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.8.4</span>
+            <span class="font-mono text-slate-800">1.8.5</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -1174,19 +1174,6 @@ export default function App() {
 
     // GitHubからのコード取得・更新
     document.getElementById('btn-fetch-github').onclick = async () => {
-      if (currentGithubUrl && currentEditingAppId) {
-          // すでに連携済みで編集画面から更新ボタンを押した場合は、共通同期ロジックを呼ぶ
-          const btn = document.getElementById('btn-fetch-github');
-          const originalText = btn.innerHTML;
-          btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
-          btn.disabled = true;
-          await syncGithubCode(currentEditingAppId, null);
-          btn.innerHTML = originalText;
-          btn.disabled = false;
-          lucide.createIcons({ root: btn.parentElement });
-          return;
-      }
-
       // 新規取得の場合の処理
       const urlInput = document.getElementById('github-url-input');
       let url = urlInput.value.trim();
@@ -1266,6 +1253,7 @@ export default function App() {
         urlInput.readOnly = true;
         urlInput.classList.add('bg-slate-100', 'text-slate-500');
         btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新';
+        updateSaveButtonsState();
 
         showAlert('GitHubから最新のソースコードを取得しました！');
       } catch (err) {
