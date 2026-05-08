@@ -255,7 +255,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.8.3</span>
+            <span class="font-mono text-slate-800">1.8.4</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -1050,8 +1050,6 @@ export default function App() {
 
       currentImageUrl = app?.imageUrl || '';
       urlInput.value = currentImageUrl;
-      document.getElementById('editor-history-comment').value = '';
-      
       document.getElementById('editor-title').textContent = app ? 'アプリを編集' : '新規アプリを登録';
       updateImagePreviewUI();
       renderHistory(app);
@@ -1281,7 +1279,7 @@ export default function App() {
     };
 
     
-    async function saveEditorApp(saveHistory = false, forceWithoutChanges = false) {
+    async function saveEditorApp(saveHistory = false, forceWithoutChanges = false, historyComment = '') {
       // 登録時の状態を更新する
       if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
           editorDraftHtml = htmlInput.value;
@@ -1290,8 +1288,6 @@ export default function App() {
       }
 
       const name = nameInput.value.trim();
-      const historyComment = document.getElementById('editor-history-comment').value.trim();
-      
       const saveCodeType = (originalAppCodeType === 'react') ? 'react' : currentCodeType;
       const sourceCode = (saveCodeType === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
 
@@ -1302,7 +1298,7 @@ export default function App() {
       if (!hasChanges && saveHistory && !forceWithoutChanges) {
         document.getElementById('confirm-title').textContent = '変更なしで履歴を保存';
         document.getElementById('confirm-msg').textContent = 'コードに変化がありません。履歴だけを残しますか？';
-        confirmCallback = async () => saveEditorApp(true, true);
+        confirmCallback = async () => saveEditorApp(true, true, historyComment);
         openModal(document.getElementById('confirm-modal'));
         return;
       }
@@ -1371,7 +1367,11 @@ export default function App() {
     }
 
     document.getElementById('btn-save-editor').onclick = async () => saveEditorApp(false);
-    document.getElementById('btn-save-editor-with-history').onclick = async () => saveEditorApp(true);
+    document.getElementById('btn-save-editor-with-history').onclick = async () => {
+      const comment = window.prompt('履歴コメントを入力してください（任意）', '');
+      if (comment === null) return;
+      await saveEditorApp(true, false, comment.trim());
+    };
 
     nameInput.addEventListener('input', updateSaveButtonsState);
     urlInput.addEventListener('input', updateSaveButtonsState);
