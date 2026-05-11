@@ -256,7 +256,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.8.8</span>
+            <span class="font-mono text-slate-800">1.8.9</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -414,6 +414,7 @@
     let sortOption = 'date-asc';
     let draggingAppId = null;
     let isInternalAppDrag = false;
+    let dropInsertIndex = null;
     
     // エディタ状態管理
     let currentEditingAppId = null;
@@ -736,26 +737,37 @@ export default function App() {
         tile.ondragend = () => {
           isInternalAppDrag = false;
           draggingAppId = null;
+          dropInsertIndex = null;
           tile.classList.remove('opacity-50');
-          gridContainer.querySelectorAll('[data-app-id]').forEach(el => el.classList.remove('ring-2', 'ring-indigo-400'));
+          document.getElementById('app-drop-marker')?.remove();
         };
         tile.ondragover = (e) => {
           e.preventDefault();
           if (!draggingAppId || draggingAppId === app.id) return;
-          tile.classList.add('ring-2', 'ring-indigo-400');
+          const rect = tile.getBoundingClientRect();
+          const insertAfter = e.clientY > rect.top + rect.height / 2;
+          const targetIndex = apps.findIndex(a => a.id === app.id);
+          dropInsertIndex = insertAfter ? targetIndex + 1 : targetIndex;
+          let marker = document.getElementById('app-drop-marker');
+          if (!marker) {
+            marker = document.createElement('div');
+            marker.id = 'app-drop-marker';
+            marker.className = "aspect-square flex items-center justify-center pointer-events-none";
+            marker.innerHTML = '<div class="w-1 h-16 bg-indigo-500 rounded-full shadow-lg"></div>';
+          }
+          gridContainer.insertBefore(marker, insertAfter ? tile.nextSibling : tile);
         };
-        tile.ondragleave = () => tile.classList.remove('ring-2', 'ring-indigo-400');
+        tile.ondragleave = () => {};
         tile.ondrop = async (e) => {
           e.preventDefault();
-          tile.classList.remove('ring-2', 'ring-indigo-400');
           const fromId = draggingAppId;
-          const toId = app.id;
-          if (!fromId || fromId === toId) return;
+          if (!fromId || dropInsertIndex === null) return;
           const fromIndex = apps.findIndex(a => a.id === fromId);
-          const toIndex = apps.findIndex(a => a.id === toId);
-          if (fromIndex < 0 || toIndex < 0) return;
+          if (fromIndex < 0) return;
           const moved = apps.splice(fromIndex, 1)[0];
-          apps.splice(toIndex, 0, moved);
+          const insertIndex = fromIndex < dropInsertIndex ? dropInsertIndex - 1 : dropInsertIndex;
+          apps.splice(insertIndex, 0, moved);
+          dropInsertIndex = null;
           sortOption = 'custom';
           sortSelect.value = 'custom';
           await saveData();
