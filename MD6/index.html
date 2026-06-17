@@ -221,6 +221,7 @@
       </div>
       <div class="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
         <button id="btn-cancel-editor" class="px-6 py-2.5 text-slate-600 hover:bg-slate-100 border rounded-xl font-medium transition-colors">キャンセル</button>
+        <button id="btn-save-editor-html" class="px-4 py-2.5 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 transition-colors">HTMLで保存</button>
         <button id="btn-save-editor-with-history" class="px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition-colors">履歴を残して保存</button>
         <button id="btn-save-editor" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2">
           <span id="save-editor-text">保存して登録</span>
@@ -256,7 +257,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.8.9</span>
+            <span class="font-mono text-slate-800">1.9.0</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -415,6 +416,7 @@
     let draggingAppId = null;
     let isInternalAppDrag = false;
     let dropInsertIndex = null;
+    let forceEnableSaveAfterRestore = false;
     
     // エディタ状態管理
     let currentEditingAppId = null;
@@ -1085,6 +1087,7 @@ export default function App() {
 
     function openEditor(app = null) {
       currentEditingAppId = app?.id || null;
+      forceEnableSaveAfterRestore = false;
       nameInput.value = app?.name || '';
       
       const ghInput = document.getElementById('github-url-input');
@@ -1143,6 +1146,7 @@ export default function App() {
     }
 
     function hasEditorChanges() {
+      if (forceEnableSaveAfterRestore) return true;
       const name = nameInput.value.trim();
       const imageUrl = document.getElementById('editor-image-url').value.trim();
       const githubUrl = (document.getElementById('github-url-input').value || '').trim();
@@ -1190,8 +1194,25 @@ export default function App() {
             <span class="text-[10px] text-slate-500 font-bold tracking-wider">${h.codeType === 'react' ? 'REACT' : 'HTML'}</span>
             ${h.comment ? `<span class="text-xs text-slate-500">${escapeHTML(h.comment)}</span>` : ''}
           </div>
-          <button class="btn-restore px-3 py-1 bg-white border border-slate-300 rounded shadow-sm text-xs text-indigo-600 hover:bg-indigo-50 font-bold transition-colors">復元</button>
+          <div class="flex items-center gap-1">
+            <button class="btn-copy-history px-3 py-1 bg-white border border-slate-300 rounded shadow-sm text-xs text-slate-600 hover:bg-slate-50 font-bold transition-colors">コピー</button>
+            <button class="btn-restore px-3 py-1 bg-white border border-slate-300 rounded shadow-sm text-xs text-indigo-600 hover:bg-indigo-50 font-bold transition-colors">復元</button>
+          </div>
         `;
+        li.querySelector('.btn-copy-history').onclick = () => {
+          const code = h.sourceCode || h.html || '';
+          if (!code) {
+            showAlert('コピーできるコードがありません。');
+            return;
+          }
+          const ta = document.createElement('textarea');
+          ta.value = code;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          showAlert(h.codeType === 'react' ? '履歴のReactソースコードをコピーしました！' : '履歴のHTMLコードをコピーしました！');
+        };
         li.querySelector('.btn-restore').onclick = () => {
           nameInput.value = h.name || '';
           currentImageUrl = h.imageUrl || '';
@@ -1204,6 +1225,8 @@ export default function App() {
           
           currentCodeType = ''; 
           setCodeTypeUI(originalAppCodeType);
+          forceEnableSaveAfterRestore = true;
+          updateSaveButtonsState();
           
           updateImagePreviewUI();
           showAlert('過去のバージョンをエディタに復元しました。\n「保存して登録」を押すと新しいバージョンとして保存されます。\n※GitHub連携は解除されます。');
@@ -1339,21 +1362,23 @@ export default function App() {
     };
 
     
-    async function saveEditorApp(saveHistory = false, forceWithoutChanges = false, historyComment = '') {
+    async function saveEditorApp(saveHistory = false, forceWithoutChanges = false, historyComment = '', forceHtmlSave = false) {
       // 登録時の状態を更新する
-      if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
+      if (forceHtmlSave) {
+          editorDraftHtml = htmlInput.value;
+      } else if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
           editorDraftHtml = htmlInput.value;
       } else if (currentCodeType === 'react' && !currentGithubUrl) {
           editorDraftReact = htmlInput.value;
       }
 
       const name = nameInput.value.trim();
-      const saveCodeType = (originalAppCodeType === 'react') ? 'react' : currentCodeType;
+      const saveCodeType = forceHtmlSave ? 'html' : ((originalAppCodeType === 'react') ? 'react' : currentCodeType);
       const sourceCode = (saveCodeType === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
 
       if (!name || !sourceCode) return;
 
-      const hasChanges = hasEditorChanges();
+      const hasChanges = forceHtmlSave ? true : hasEditorChanges();
       if (!hasChanges && !saveHistory) return;
       if (!hasChanges && saveHistory && !forceWithoutChanges) {
         document.getElementById('confirm-title').textContent = '変更なしで履歴を保存';
@@ -1413,6 +1438,7 @@ export default function App() {
 
             renderGrid();
             closeModal(editorModal);
+            forceEnableSaveAfterRestore = false;
 
         } catch (err) {
             console.error(err);
@@ -1427,6 +1453,40 @@ export default function App() {
     }
 
     document.getElementById('btn-save-editor').onclick = async () => saveEditorApp(false);
+    document.getElementById('btn-save-editor-html').onclick = () => {
+      if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
+        editorDraftHtml = htmlInput.value;
+      } else if (currentCodeType === 'react' && !currentGithubUrl) {
+        editorDraftReact = htmlInput.value;
+      }
+
+      const name = nameInput.value.trim() || 'app';
+      const codeTypeForDownload = (originalAppCodeType === 'react') ? 'react' : currentCodeType;
+      const sourceCode = (codeTypeForDownload === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
+      if (!sourceCode) {
+        showAlert('ダウンロードするHTMLコードがありません。');
+        return;
+      }
+
+      let downloadHtml = sourceCode;
+      if (codeTypeForDownload === 'react') {
+        try {
+          downloadHtml = generateReactHTML(sourceCode, name);
+        } catch (err) {
+          console.error(err);
+          showAlert('ReactコードのHTML変換に失敗しました。\\n構文を確認してください。');
+          return;
+        }
+      }
+
+      const blob = new Blob([downloadHtml], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name.replace(/[\\\\/:*?\"<>|]/g, '_') || 'app'}.html`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showAlert('HTMLファイルをダウンロードしました。');
+    };
     document.getElementById('btn-save-editor-with-history').onclick = async () => {
       const comment = window.prompt('履歴コメントを入力してください（任意）', '');
       if (comment === null) return;
