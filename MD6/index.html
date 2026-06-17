@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebApp Hub</title>
-  
+
   <!-- PWA & App Icons -->
   <meta name="theme-color" content="#4f46e5">
   <link rel="icon" type="image/x-icon" href="./favicon.ico">
   <link rel="apple-touch-icon" href="./favicon.ico">
   <link rel="manifest" href="./manifest.json">
-  
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
@@ -23,7 +23,7 @@
     @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     .animate-fade-in { animation: fadeIn 0.15s ease-out forwards; }
     .animate-zoom-in { animation: zoomIn 0.2s ease-out forwards; }
-    
+
     /* スクロールバー */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -38,7 +38,7 @@
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
+
     /* ロゴのホバー効果 */
     .logo-container:hover .logo-icon {
       transform: scale(1.1);
@@ -73,7 +73,7 @@
             <i data-lucide="rotate-cw" class="w-4 h-4"></i>
           </button>
         </div>
-        
+
         <div id="home-tools" class="flex items-center gap-2">
           <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2">
             <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-slate-400 mr-1"></i>
@@ -106,7 +106,7 @@
        メインコンテンツエリア
   ==================== -->
   <main class="flex-1 relative overflow-hidden bg-slate-50/30">
-    
+
     <!-- グリッド表示（ホーム） -->
     <div id="main-view" class="absolute inset-0 overflow-y-auto p-6 md:p-10 z-10 transition-opacity duration-200">
       <div class="max-w-[1600px] mx-auto">
@@ -128,7 +128,7 @@
   <!-- ====================
        モーダル群
   ==================== -->
-  
+
   <!-- エディタモーダル -->
   <div id="editor-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] items-center justify-center p-4 hidden animate-fade-in">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-zoom-in">
@@ -176,7 +176,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- 右カラム: コードエディタ -->
           <div class="flex-1 flex flex-col h-full min-h-[300px]">
             <div class="flex justify-between items-end mb-2">
@@ -185,6 +185,9 @@
                 <div class="flex items-center gap-1">
                   <button type="button" id="btn-copy-html" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="表示中のコードをコピー">
                     <i data-lucide="copy" class="w-4 h-4"></i>
+                  </button>
+                  <button type="button" id="btn-repair-html" class="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="変換済みHTMLを修復">
+                    <i data-lucide="wand-sparkles" class="w-4 h-4"></i>
                   </button>
                   <button type="button" id="btn-clear-code" class="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="すべてクリア">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -221,6 +224,7 @@
       </div>
       <div class="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
         <button id="btn-cancel-editor" class="px-6 py-2.5 text-slate-600 hover:bg-slate-100 border rounded-xl font-medium transition-colors">キャンセル</button>
+        <button id="btn-repair-save-html" class="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors">修復してHTML保存</button>
         <button id="btn-save-editor-html" class="px-4 py-2.5 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 transition-colors">HTMLで保存</button>
         <button id="btn-save-editor-with-history" class="px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition-colors">履歴を残して保存</button>
         <button id="btn-save-editor" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2">
@@ -257,7 +261,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.9.0</span>
+            <span class="font-mono text-slate-800">1.9.4</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -358,7 +362,7 @@
     window.addEventListener('hashchange', () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const tabFromHash = hashParams.get('tab') || 'home';
-      
+
       if (tabFromHash === 'home' || apps.find(a => a.id === tabFromHash)) {
           switchTab(tabFromHash, true);
       } else {
@@ -410,20 +414,20 @@
 
     // --- 状態管理 ---
     let apps = [];
-    let openAppIds = []; 
+    let openAppIds = [];
     let activeTabId = 'home';
     let sortOption = 'date-asc';
     let draggingAppId = null;
     let isInternalAppDrag = false;
     let dropInsertIndex = null;
     let forceEnableSaveAfterRestore = false;
-    
+
     // エディタ状態管理
     let currentEditingAppId = null;
     let currentImageUrl = '';
-    let currentCodeType = 'html'; 
+    let currentCodeType = 'html';
     let currentGithubUrl = '';
-    
+
     // 編集中のコードや、登録済みの種類を追跡する
     let editorDraftHtml = '';
     let editorDraftReact = '';
@@ -431,9 +435,9 @@
 
     let importPendingData = null;
     let confirmCallback = null;
-    
+
     // 設定
-    let tabDisplayMode = 'full'; 
+    let tabDisplayMode = 'full';
 
     // --- GitHub 同期共通ロジック ---
     async function syncGithubCode(appId, iconElement = null) {
@@ -473,7 +477,7 @@
             // エディタの「保存して登録」と同じロジック
             const isReact = url.match(/\.(jsx|tsx|js)$/i) || app.codeType === 'react';
             const saveCodeType = isReact ? 'react' : 'html';
-            
+
             let runnableHtml = sourceCode;
             if (saveCodeType === 'react') {
                 try {
@@ -484,11 +488,11 @@
                 }
             }
 
-            const updatedApp = { 
-                ...app, 
-                codeType: saveCodeType, 
-                sourceCode: sourceCode, 
-                html: runnableHtml
+            const updatedApp = {
+                ...app,
+                codeType: saveCodeType,
+                sourceCode: sourceCode,
+                html: normalizeGeneratedReactHtml(runnableHtml)
             };
 
             // 保存して画面に反映
@@ -496,7 +500,7 @@
             await saveData();
 
             const iframe = document.getElementById(`iframe-${app.id}`);
-            if (iframe) iframe.srcdoc = injectStorageShim(app.id, runnableHtml);
+            if (iframe) iframe.srcdoc = injectStorageShim(app.id, normalizeGeneratedReactHtml(runnableHtml));
 
             renderGrid();
             showAlert('GitHubから最新のコードに同期しました！');
@@ -513,6 +517,35 @@
             if (iconElement) iconElement.classList.remove('animate-spin');
         }
         updateSaveButtonsState();
+    }
+
+
+    // --- React変換HTMLの依存関係 ---
+    // @babel/standalone や lucide の `latest` は配信先の更新で挙動が変わるため、
+    // 生成済みHTMLが突然動かなくならないように既知の安定版へ固定する。
+    const REACT_HTML_DEPS = {
+      tailwind: 'https://cdn.tailwindcss.com',
+      react: 'https://unpkg.com/react@18.3.1/umd/react.production.min.js',
+      reactDom: 'https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js',
+      babel: 'https://unpkg.com/@babel/standalone@7.26.9/babel.min.js',
+      lucide: 'https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js'
+    };
+
+    function normalizeGeneratedReactHtml(html) {
+      if (!html || typeof html !== 'string') return html;
+
+      let normalized = html
+        .replace(/https:\/\/unpkg\.com\/react@18\/umd\/react\.production\.min\.js/g, REACT_HTML_DEPS.react)
+        .replace(/https:\/\/unpkg\.com\/react-dom@18\/umd\/react-dom\.production\.min\.js/g, REACT_HTML_DEPS.reactDom)
+        .replace(/https:\/\/unpkg\.com\/@babel\/standalone(?:@[^\/"']+)?\/babel\.min\.js/g, REACT_HTML_DEPS.babel)
+        .replace(/https:\/\/unpkg\.com\/lucide@latest(?:\/dist\/umd\/lucide(?:\.min)?\.js)?/g, REACT_HTML_DEPS.lucide);
+
+      normalized = normalized.replace(
+        /<script\s+type=["']text\/babel["'](?![^>]*data-presets)([^>]*)>/g,
+        '<script type="text/babel" data-presets="env,react"$1>'
+      );
+
+      return normalized;
     }
 
     // --- デフォルトコード ---
@@ -536,13 +569,13 @@ import { Play } from 'lucide-react';
 
 export default function App() {
   const [count, setCount] = useState(0);
-  
+
   return (
     <div className="flex flex-col h-screen items-center justify-center bg-slate-50 gap-4">
       <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
         <Play className="text-indigo-500" /> React App
       </h1>
-      <button 
+      <button
         onClick={() => setCount(c => c + 1)}
         className="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition font-bold"
       >
@@ -590,15 +623,15 @@ export default function App() {
 
     // --- ユーティリティ ---
     const generateId = () => {
-      try { return crypto.randomUUID(); } catch(e) { 
-        return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9); 
+      try { return crypto.randomUUID(); } catch(e) {
+        return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
       }
     };
     const escapeHTML = (str) => {
       if (!str) return '';
       return str.replace(/[&<>'"]/g, tag => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[tag] || tag));
     };
-    
+
     const getColorFromName = (name) => {
       const colors = ['from-red-400 to-rose-600', 'from-orange-400 to-red-500', 'from-amber-400 to-orange-500', 'from-emerald-400 to-teal-600', 'from-cyan-400 to-blue-600', 'from-blue-500 to-indigo-600', 'from-violet-500 to-purple-600', 'from-fuchsia-400 to-pink-600'];
       let hash = 0;
@@ -610,7 +643,7 @@ export default function App() {
     async function init() {
       // IndexedDB からデータを取得
       let savedData = await idbGet('webapp_hub_data');
-      
+
       // IndexedDBにデータがない場合、過去のlocalStorageから移行を試みる
       if (!savedData) {
         const lsData = localStorage.getItem('webapp_hub_data');
@@ -624,11 +657,12 @@ export default function App() {
       }
 
       if (savedData && Array.isArray(savedData)) {
-        try { 
+        try {
             apps = savedData.map(app => ({
                 ...app,
                 codeType: app.codeType || 'html',
                 sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
+                html: (app.codeType || 'html') === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
                 history: app.history || [],
                 githubUrl: app.githubUrl || ''
             }));
@@ -706,12 +740,12 @@ export default function App() {
         tile.draggable = true;
         tile.dataset.appId = app.id;
 
-        let iconContent = app.imageUrl 
-          ? `<img src="${escapeHTML(app.imageUrl)}" class="w-full h-full object-cover" />` 
+        let iconContent = app.imageUrl
+          ? `<img src="${escapeHTML(app.imageUrl)}" class="w-full h-full object-cover" />`
           : app.name.substring(0, 2).toUpperCase();
         const bgClass = app.imageUrl ? 'bg-slate-50' : `bg-gradient-to-br ${getColorFromName(app.name)} text-white`;
 
-        const badge = app.codeType === 'react' 
+        const badge = app.codeType === 'react'
             ? `<div class="absolute top-3 left-3 bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm z-10"><i data-lucide="file-json" class="w-2.5 h-2.5 inline mr-0.5"></i>React</div>`
             : '';
 
@@ -792,7 +826,7 @@ export default function App() {
         const isActive = activeTabId === id;
         tab.className = `group flex items-center gap-2 h-full font-bold text-sm transition-all shrink-0 border-x border-slate-100 ${isActive ? 'tab-active' : 'text-slate-400 hover:bg-slate-50'} ${tabDisplayMode === 'icon-only' ? 'px-2' : 'pl-4 pr-2'}`;
         tab.onclick = () => switchTab(id);
-        tab.onmousedown = (e) => { if(e.button === 1) { e.preventDefault(); closeTab(id); } }; 
+        tab.onmousedown = (e) => { if(e.button === 1) { e.preventDefault(); closeTab(id); } };
 
         if (tabDisplayMode === 'icon-only') {
           let iconInner = '';
@@ -817,7 +851,7 @@ export default function App() {
             </div>
           `;
         }
-        
+
         tab.querySelector('.btn-close-tab').onclick = (e) => { e.stopPropagation(); closeTab(id); };
         tabContainer.appendChild(tab);
       });
@@ -835,7 +869,7 @@ export default function App() {
         runnerView.style.display = 'flex';
         homeTools.classList.add('hidden');
         runnerTools.classList.remove('hidden');
-        
+
         Array.from(iframeManager.children).forEach(iframe => {
           iframe.classList.toggle('hidden', iframe.id !== `iframe-${activeTabId}`);
         });
@@ -917,7 +951,7 @@ export default function App() {
           Object.defineProperty(window, 'localStorage', { get: () => scopedLS, configurable: true });
         })();
       <\/script>`;
-      
+
       if (html.includes('<head>')) {
         return html.replace('<head>', '<head>\n' + shim);
       }
@@ -934,7 +968,7 @@ export default function App() {
             parts.forEach(part => {
                 const cleanPart = part.trim();
                 if (!cleanPart) return;
-                
+
                 if (cleanPart.includes(' as ')) {
                     const [original, alias] = cleanPart.split(/\s+as\s+/);
                     iconMap.push({ original: original.trim(), alias: alias.trim() });
@@ -946,14 +980,117 @@ export default function App() {
         return iconMap;
     }
 
+    function getGeneratedLucideRuntime() {
+        return `        const toKebabIconName = (value) => String(value || '')
+            .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+            .replace(/([a-zA-Z])([0-9])/g, '$1-$2')
+            .toLowerCase();
+
+        const toPascalIconName = (value) => toKebabIconName(value)
+            .split('-')
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join('');
+
+        const setSvgAttributes = (element, attrs = {}) => {
+            Object.entries(attrs).forEach(([key, value]) => {
+                const attrName = key.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase());
+                element.setAttribute(attrName, value);
+            });
+        };
+
+        const appendIconNodes = (parent, iconNodes = []) => {
+            iconNodes.forEach(([tag, attrs, children]) => {
+                const child = document.createElementNS('http://www.w3.org/2000/svg', tag);
+                setSvgAttributes(child, attrs);
+                if (children) appendIconNodes(child, children);
+                parent.appendChild(child);
+            });
+        };
+
+        const getLucideSvgContent = (name) => {
+            if (!window.lucide) return '';
+
+            const kebabName = toKebabIconName(name);
+            const pascalName = toPascalIconName(name);
+            const icon = window.lucide.icons?.[pascalName] || window.lucide.icons?.[name];
+
+            if (icon) {
+                if (window.lucide.createElement) {
+                    const svgNode = window.lucide.createElement(icon);
+                    if (svgNode) return svgNode.innerHTML;
+                }
+
+                const iconNodes = icon.iconNode || icon;
+                if (Array.isArray(iconNodes)) {
+                    const svgNode = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    appendIconNodes(svgNode, iconNodes);
+                    return svgNode.innerHTML;
+                }
+            }
+
+            if (window.lucide.createIcons) {
+                const temp = document.createElement('div');
+                temp.innerHTML = '<i data-lucide="' + kebabName + '"></i>';
+                window.lucide.createIcons({ root: temp });
+                return temp.querySelector('svg')?.innerHTML || '';
+            }
+
+            return '';
+        };
+
+        const Icon = ({ name, size = 24, strokeWidth = 2, className = "", color = "currentColor", ...props }) => {
+            const [svgContent, setSvgContent] = useState(() => getLucideSvgContent(name));
+
+            useEffect(() => {
+                setSvgContent(getLucideSvgContent(name));
+            }, [name]);
+
+            return (
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width={size}
+                    height={size}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={strokeWidth}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={className}
+                    {...props}
+                    dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+            );
+        };`;
+    }
+
+    function repairGeneratedReactHtml(html) {
+        let repaired = normalizeGeneratedReactHtml(html);
+        if (!repaired || typeof repaired !== 'string') return repaired;
+
+        const legacyIconRuntimeRegex = /        const Icon = \(\{ name, size = 24[\s\S]*?\n        \};\n\n(?=\s*(?:const\s+\w+\s*=\s*\(props\)|function\s+\w+|const\s+\w+\s*=|class\s+\w+|let\s+|var\s+))/;
+        if (legacyIconRuntimeRegex.test(repaired) && !repaired.includes('const getLucideSvgContent = (name) =>')) {
+            repaired = repaired.replace(legacyIconRuntimeRegex, getGeneratedLucideRuntime() + '\n\n');
+        }
+
+        return repaired;
+    }
+
+    function repairEmbeddedGeneratedHtmlCode(code) {
+        // 登録するアプリ自身がレポートHTMLなどを文字列生成する場合、
+        // その文字列内の古いReact変換HTML依存も同じ修復ルールで更新する。
+        return repairGeneratedReactHtml(code);
+    }
+
     function generateReactHTML(source, appName) {
         const iconMap = parseLucideIcons(source);
-        const iconShims = iconMap.map(icon => 
+        const iconShims = iconMap.map(icon =>
             `const ${icon.alias} = (props) => <Icon name="${icon.original}" {...props} />;`
         ).join('\n        ');
 
         let processedCode = source.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '');
-        
+
         let mainComponentName = "App";
         const exportMatch = source.match(/export\s+default\s+(?:function\s+([A-Za-z0-9_]+)|([A-Za-z0-9_]+))/);
         if (exportMatch) {
@@ -970,11 +1107,11 @@ export default function App() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>${escapeHTML(appName)}</title>
     <!-- Dependencies -->
-    <script src="https://cdn.tailwindcss.com"><\/script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
-    <script src="https://unpkg.com/lucide@latest"><\/script>
+    <script src="${REACT_HTML_DEPS.tailwind}"><\/script>
+    <script src="${REACT_HTML_DEPS.react}"><\/script>
+    <script src="${REACT_HTML_DEPS.reactDom}"><\/script>
+    <script src="${REACT_HTML_DEPS.babel}"><\/script>
+    <script src="${REACT_HTML_DEPS.lucide}"><\/script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
@@ -985,45 +1122,10 @@ export default function App() {
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="env,react">
         const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
-        const Icon = ({ name, size = 24, strokeWidth = 2, className = "", color = "currentColor", ...props }) => {
-            const [svgContent, setSvgContent] = useState("");
-            
-            useEffect(() => {
-                if (window.lucide) {
-                    const kebabName = name
-                        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-                        .replace(/([a-zA-Z])([0-9])/g, '$1-$2')
-                        .toLowerCase();
-                    const temp = document.createElement('div');
-                    temp.innerHTML = '<i data-lucide="' + kebabName + '"></i>';
-                    window.lucide.createIcons({ root: temp });
-                    const svgNode = temp.querySelector('svg');
-                    if (svgNode) {
-                        setSvgContent(svgNode.innerHTML);
-                    }
-                }
-            }, [name]);
-
-            return (
-                <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    width={size} 
-                    height={size} 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={color} 
-                    strokeWidth={strokeWidth} 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    className={className} 
-                    {...props}
-                    dangerouslySetInnerHTML={{ __html: svgContent }}
-                />
-            );
-        };
+${getGeneratedLucideRuntime()}
 
         ${iconShims}
 
@@ -1034,6 +1136,16 @@ export default function App() {
     <\/script>
 </body>
 </html>`;
+    }
+
+    function buildReactHtmlForStoredApp(app) {
+        try {
+            const source = app.sourceCode || app.html || '';
+            return normalizeGeneratedReactHtml(generateReactHTML(source, app.name || 'App'));
+        } catch (e) {
+            console.warn('React HTML regeneration failed; falling back to normalized stored HTML.', e);
+            return repairGeneratedReactHtml(app.html);
+        }
     }
 
     // --- エディタ関連ロジック ---
@@ -1047,11 +1159,11 @@ export default function App() {
 
         currentCodeType = type;
         const isLinked = !!currentGithubUrl;
-        
+
         if (type === 'html') {
             btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all";
             btnTypeReact.className = "px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all";
-            
+
             htmlInput.value = editorDraftHtml;
 
             // Reactとして登録済みの場合は、HTMLは変換結果として扱いリードオンリーにする
@@ -1067,9 +1179,9 @@ export default function App() {
         } else {
             btnTypeReact.className = "px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-slate-800 transition-all";
             btnTypeHtml.className = "px-3 py-1.5 text-xs font-bold rounded-md text-slate-500 hover:text-slate-800 transition-all";
-            
+
             htmlInput.value = editorDraftReact;
-            
+
             if (isLinked) {
                 htmlInput.readOnly = true;
                 htmlInput.classList.add('bg-slate-800', 'text-slate-400', 'cursor-not-allowed', 'opacity-80');
@@ -1089,7 +1201,7 @@ export default function App() {
       currentEditingAppId = app?.id || null;
       forceEnableSaveAfterRestore = false;
       nameInput.value = app?.name || '';
-      
+
       const ghInput = document.getElementById('github-url-input');
       const ghBtn = document.getElementById('btn-fetch-github');
 
@@ -1098,7 +1210,7 @@ export default function App() {
           editorDraftHtml = app.html || '';
           editorDraftReact = app.sourceCode || '';
           currentGithubUrl = app.githubUrl || '';
-          
+
           currentCodeType = ''; // 強制更新のため一度リセット
           setCodeTypeUI(originalAppCodeType);
       } else {
@@ -1106,7 +1218,7 @@ export default function App() {
           editorDraftHtml = htmlDefaultCode;
           editorDraftReact = reactDefaultCode;
           currentGithubUrl = '';
-          
+
           currentCodeType = ''; // 強制更新のため一度リセット
           setCodeTypeUI('html');
       }
@@ -1177,13 +1289,13 @@ export default function App() {
       const section = document.getElementById('editor-history-section');
       const list = document.getElementById('editor-history-list');
       list.innerHTML = '';
-      
+
       if (!app || !app.history || app.history.length === 0) {
         section.classList.add('hidden');
         return;
       }
       section.classList.remove('hidden');
-      
+
       [...app.history].reverse().forEach(h => {
         const d = new Date(h.timestamp);
         const li = document.createElement('li');
@@ -1217,20 +1329,20 @@ export default function App() {
           nameInput.value = h.name || '';
           currentImageUrl = h.imageUrl || '';
           urlInput.value = currentImageUrl;
-          
+
           originalAppCodeType = h.codeType || 'html';
           // 履歴から復元する際、軽量化されたsourceCodeを利用する
           editorDraftHtml = h.sourceCode || h.html || '';
           editorDraftReact = h.sourceCode || h.html || '';
-          
-          currentCodeType = ''; 
+
+          currentCodeType = '';
           setCodeTypeUI(originalAppCodeType);
           forceEnableSaveAfterRestore = true;
           updateSaveButtonsState();
-          
+
           updateImagePreviewUI();
           showAlert('過去のバージョンをエディタに復元しました。\n「保存して登録」を押すと新しいバージョンとして保存されます。\n※GitHub連携は解除されます。');
-          
+
           // 復元時はGitHub連携を一旦解除する（ユーザーが手動でいじれるように）
           currentGithubUrl = '';
           const ghInput = document.getElementById('github-url-input');
@@ -1247,15 +1359,32 @@ export default function App() {
     document.getElementById('btn-copy-html').onclick = () => {
       const sourceCode = htmlInput.value;
       if (!sourceCode) return;
-      
+
       const ta = document.createElement('textarea');
       ta.value = sourceCode;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      
+
       showAlert(currentCodeType === 'react' ? 'Reactソースコードをコピーしました！' : 'HTMLコードをコピーしました！');
+    };
+
+
+    document.getElementById('btn-repair-html').onclick = () => {
+      const source = htmlInput.value;
+      if (!source.trim()) {
+        showAlert('修復するHTMLコードがありません。');
+        return;
+      }
+
+      const repaired = repairGeneratedReactHtml(source);
+      htmlInput.value = repaired;
+      if (currentCodeType === 'html') {
+        editorDraftHtml = repaired;
+      }
+      updateSaveButtonsState();
+      showAlert('変換済みHTMLを修復しました。\n必要に応じて「保存して登録」または「HTMLで保存」を押してください。');
     };
 
     document.getElementById('btn-clear-code').onclick = () => {
@@ -1280,7 +1409,7 @@ export default function App() {
       // GitHubの通常URLをRaw URLに変換 (より堅牢なパース)
       try {
         const urlObj = new URL(url);
-        
+
         // GitHubのUIからコピーした際につきやすい不要なパラメータや行数指定(#)を削除
         urlObj.search = '';
         urlObj.hash = '';
@@ -1336,7 +1465,7 @@ export default function App() {
         }
 
         setCodeTypeUI(originalAppCodeType);
-        
+
         // アプリ名が空ならファイル名から自動設定
         if (!nameInput.value.trim()) {
           let fileName = originalUrl.split('/').pop().split('.')[0];
@@ -1361,7 +1490,7 @@ export default function App() {
       }
     };
 
-    
+
     async function saveEditorApp(saveHistory = false, forceWithoutChanges = false, historyComment = '', forceHtmlSave = false) {
       // 登録時の状態を更新する
       if (forceHtmlSave) {
@@ -1374,7 +1503,13 @@ export default function App() {
 
       const name = nameInput.value.trim();
       const saveCodeType = forceHtmlSave ? 'html' : ((originalAppCodeType === 'react') ? 'react' : currentCodeType);
-      const sourceCode = (saveCodeType === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
+      let sourceCode = (saveCodeType === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
+      sourceCode = repairEmbeddedGeneratedHtmlCode(sourceCode);
+      if (saveCodeType === 'react') {
+          editorDraftReact = sourceCode;
+      } else {
+          editorDraftHtml = sourceCode;
+      }
 
       if (!name || !sourceCode) return;
 
@@ -1392,7 +1527,7 @@ export default function App() {
       const saveBtnHistory = document.getElementById('btn-save-editor-with-history');
       const saveText = document.getElementById('save-editor-text');
       const saveLoader = document.getElementById('save-editor-loader');
-      
+
       saveBtn.disabled = true;
       saveBtnHistory.disabled = true;
       saveText.textContent = "変換・保存中...";
@@ -1401,7 +1536,7 @@ export default function App() {
       setTimeout(async () => {
         try {
             let runnableHtml = sourceCode;
-            
+
             if (saveCodeType === 'react') {
                 runnableHtml = generateReactHTML(sourceCode, name);
             }
@@ -1416,24 +1551,24 @@ export default function App() {
                 newHistory = [...newHistory, historyItem].slice(-10);
               }
 
-              newApps = newApps.map(a => a.id === currentEditingAppId ? { 
-                ...a, name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, history: newHistory, githubUrl: currentGithubUrl 
+              newApps = newApps.map(a => a.id === currentEditingAppId ? {
+                ...a, name, codeType: saveCodeType, sourceCode, html: normalizeGeneratedReactHtml(runnableHtml), imageUrl: currentImageUrl, history: newHistory, githubUrl: currentGithubUrl
               } : a);
-              
+
             } else {
-              const newApp = { id: generateId(), name, codeType: saveCodeType, sourceCode, html: runnableHtml, imageUrl: currentImageUrl, createdAt: Date.now(), history: [], githubUrl: currentGithubUrl };
+              const newApp = { id: generateId(), name, codeType: saveCodeType, sourceCode, html: normalizeGeneratedReactHtml(runnableHtml), imageUrl: currentImageUrl, createdAt: Date.now(), history: [], githubUrl: currentGithubUrl };
               if (saveHistory) {
                 newApp.history = [{ timestamp: Date.now(), name, codeType: saveCodeType, sourceCode, imageUrl: currentImageUrl, comment: historyComment }];
               }
               newApps.push(newApp);
             }
-            
+
             apps = newApps;
             await saveData();
 
             if (currentEditingAppId) {
                 const iframe = document.getElementById(`iframe-${currentEditingAppId}`);
-                if (iframe) iframe.srcdoc = injectStorageShim(currentEditingAppId, runnableHtml);
+                if (iframe) iframe.srcdoc = injectStorageShim(currentEditingAppId, normalizeGeneratedReactHtml(runnableHtml));
             }
 
             renderGrid();
@@ -1462,7 +1597,7 @@ export default function App() {
 
       const name = nameInput.value.trim() || 'app';
       const codeTypeForDownload = (originalAppCodeType === 'react') ? 'react' : currentCodeType;
-      const sourceCode = (codeTypeForDownload === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
+      const sourceCode = repairEmbeddedGeneratedHtmlCode((codeTypeForDownload === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim());
       if (!sourceCode) {
         showAlert('ダウンロードするHTMLコードがありません。');
         return;
@@ -1479,7 +1614,7 @@ export default function App() {
         }
       }
 
-      const blob = new Blob([downloadHtml], { type: 'text/html' });
+      const blob = new Blob([repairGeneratedReactHtml(downloadHtml)], { type: 'text/html' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${name.replace(/[\\\\/:*?\"<>|]/g, '_') || 'app'}.html`;
@@ -1487,6 +1622,22 @@ export default function App() {
       URL.revokeObjectURL(a.href);
       showAlert('HTMLファイルをダウンロードしました。');
     };
+
+    document.getElementById('btn-repair-save-html').onclick = () => {
+      const source = htmlInput.value;
+      if (!source.trim()) {
+        showAlert('修復するHTMLコードがありません。');
+        return;
+      }
+
+      const repaired = repairGeneratedReactHtml(source);
+      htmlInput.value = repaired;
+      if (currentCodeType === 'html') {
+        editorDraftHtml = repaired;
+      }
+      document.getElementById('btn-save-editor-html').click();
+    };
+
     document.getElementById('btn-save-editor-with-history').onclick = async () => {
       const comment = window.prompt('履歴コメントを入力してください（任意）', '');
       if (comment === null) return;
@@ -1540,21 +1691,21 @@ export default function App() {
       openModal(settingsModal);
       updateSettingsUI();
     }
-    
+
     function updateSettingsUI() {
       const btnFull = document.getElementById('tab-mode-full');
       const btnIcon = document.getElementById('tab-mode-icon');
-      
+
       const activeClass = "bg-white text-indigo-600 shadow-sm";
       const inactiveClass = "text-slate-500 hover:text-slate-700";
-      
+
       btnFull.className = `flex-1 py-2 text-sm font-medium rounded-lg transition-all ${tabDisplayMode === 'full' ? activeClass : inactiveClass}`;
       btnIcon.className = `flex-1 py-2 text-sm font-medium rounded-lg transition-all ${tabDisplayMode === 'icon-only' ? activeClass : inactiveClass}`;
     }
 
     document.getElementById('tab-mode-full').onclick = async () => { tabDisplayMode = 'full'; updateSettingsUI(); await saveData(); renderTabs(); };
     document.getElementById('tab-mode-icon').onclick = async () => { tabDisplayMode = 'icon-only'; updateSettingsUI(); await saveData(); renderTabs(); };
-    
+
     // イベントリスナー
     document.getElementById('btn-settings').onclick = openSettings;
     document.getElementById('btn-close-settings').onclick = () => closeModal(settingsModal);
@@ -1574,12 +1725,12 @@ export default function App() {
         sortOption = 'date-asc';
         tabDisplayMode = 'full';
         sortSelect.value = sortOption;
-        
+
         // localStorageをクリア
         localStorage.removeItem('webapp_hub_sort');
         localStorage.removeItem('webapp_hub_settings');
-        localStorage.removeItem('webapp_hub_data'); 
-        
+        localStorage.removeItem('webapp_hub_data');
+
         // IndexedDBをクリア
         try {
           const db = await openDB();
@@ -1622,7 +1773,7 @@ export default function App() {
     let dragCounter = 0;
 
     window.addEventListener('dragenter', (e) => {
-      if (activeTabId !== 'home') return; 
+      if (activeTabId !== 'home') return;
       if (isInternalAppDrag) return;
       e.preventDefault();
       if (e.dataTransfer.types.includes('Files')) {
@@ -1656,7 +1807,7 @@ export default function App() {
       dragCounter = 0;
       dropOverlay.classList.add('hidden');
       dropOverlay.classList.remove('flex');
-      
+
       Array.from(e.dataTransfer.files).forEach(file => {
         if (file.name.endsWith('.html')) {
           const reader = new FileReader();
@@ -1760,11 +1911,12 @@ export default function App() {
         try {
           const data = JSON.parse(ev.target.result);
           if (!Array.isArray(data)) throw new Error();
-          
+
           importPendingData = data.map(app => ({
               ...app,
               codeType: app.codeType || 'html',
               sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
+              html: (app.codeType || 'html') === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
               history: app.history || [],
               githubUrl: app.githubUrl || ''
           }));
