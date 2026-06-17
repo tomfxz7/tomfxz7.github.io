@@ -257,7 +257,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.9.1</span>
+            <span class="font-mono text-slate-800">1.9.2</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -658,7 +658,7 @@ export default function App() {
                 ...app,
                 codeType: app.codeType || 'html',
                 sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
-                html: (app.codeType || 'html') === 'react' ? normalizeGeneratedReactHtml(app.html) : app.html,
+                html: (app.codeType || 'html') === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
                 history: app.history || [],
                 githubUrl: app.githubUrl || ''
             }));
@@ -1018,23 +1018,69 @@ export default function App() {
     <script type="text/babel" data-presets="env,react">
         const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
+        const toKebabIconName = (value) => String(value || '')
+            .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+            .replace(/([a-zA-Z])([0-9])/g, '$1-$2')
+            .toLowerCase();
+
+        const toPascalIconName = (value) => toKebabIconName(value)
+            .split('-')
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join('');
+
+        const setSvgAttributes = (element, attrs = {}) => {
+            Object.entries(attrs).forEach(([key, value]) => {
+                const attrName = key.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase());
+                element.setAttribute(attrName, value);
+            });
+        };
+
+        const appendIconNodes = (parent, iconNodes = []) => {
+            iconNodes.forEach(([tag, attrs, children]) => {
+                const child = document.createElementNS('http://www.w3.org/2000/svg', tag);
+                setSvgAttributes(child, attrs);
+                if (children) appendIconNodes(child, children);
+                parent.appendChild(child);
+            });
+        };
+
+        const getLucideSvgContent = (name) => {
+            if (!window.lucide) return '';
+
+            const kebabName = toKebabIconName(name);
+            const pascalName = toPascalIconName(name);
+            const icon = window.lucide.icons?.[pascalName] || window.lucide.icons?.[name];
+
+            if (icon) {
+                if (window.lucide.createElement) {
+                    const svgNode = window.lucide.createElement(icon);
+                    if (svgNode) return svgNode.innerHTML;
+                }
+
+                const iconNodes = icon.iconNode || icon;
+                if (Array.isArray(iconNodes)) {
+                    const svgNode = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    appendIconNodes(svgNode, iconNodes);
+                    return svgNode.innerHTML;
+                }
+            }
+
+            if (window.lucide.createIcons) {
+                const temp = document.createElement('div');
+                temp.innerHTML = '<i data-lucide="' + kebabName + '"></i>';
+                window.lucide.createIcons({ root: temp });
+                return temp.querySelector('svg')?.innerHTML || '';
+            }
+
+            return '';
+        };
+
         const Icon = ({ name, size = 24, strokeWidth = 2, className = "", color = "currentColor", ...props }) => {
-            const [svgContent, setSvgContent] = useState("");
+            const [svgContent, setSvgContent] = useState(() => getLucideSvgContent(name));
 
             useEffect(() => {
-                if (window.lucide) {
-                    const kebabName = name
-                        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-                        .replace(/([a-zA-Z])([0-9])/g, '$1-$2')
-                        .toLowerCase();
-                    const temp = document.createElement('div');
-                    temp.innerHTML = '<i data-lucide="' + kebabName + '"></i>';
-                    window.lucide.createIcons({ root: temp });
-                    const svgNode = temp.querySelector('svg');
-                    if (svgNode) {
-                        setSvgContent(svgNode.innerHTML);
-                    }
-                }
+                setSvgContent(getLucideSvgContent(name));
             }, [name]);
 
             return (
@@ -1064,6 +1110,16 @@ export default function App() {
     <\/script>
 </body>
 </html>`;
+    }
+
+    function buildReactHtmlForStoredApp(app) {
+        try {
+            const source = app.sourceCode || app.html || '';
+            return normalizeGeneratedReactHtml(generateReactHTML(source, app.name || 'App'));
+        } catch (e) {
+            console.warn('React HTML regeneration failed; falling back to normalized stored HTML.', e);
+            return normalizeGeneratedReactHtml(app.html);
+        }
     }
 
     // --- エディタ関連ロジック ---
@@ -1795,7 +1851,7 @@ export default function App() {
               ...app,
               codeType: app.codeType || 'html',
               sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
-              html: (app.codeType || 'html') === 'react' ? normalizeGeneratedReactHtml(app.html) : app.html,
+              html: (app.codeType || 'html') === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
               history: app.history || [],
               githubUrl: app.githubUrl || ''
           }));
