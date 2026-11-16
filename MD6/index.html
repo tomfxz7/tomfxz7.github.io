@@ -44,6 +44,17 @@
       transform: scale(1.1);
       background-color: #e0e7ff;
     }
+    .app-tile { touch-action: pan-y; }
+    .app-tile.drop-before::before, .app-tile.drop-after::after {
+      content: ''; position: absolute; top: 10%; bottom: 10%; width: 4px;
+      background: #6366f1; border-radius: 4px; pointer-events: none;
+    }
+    .app-tile.drop-before::before { left: -10px; }
+    .app-tile.drop-after::after { right: -10px; }
+    .app-tile.drop-stack { outline: 3px solid #6366f1; background: #eef2ff; }
+    .tile-actions { opacity: 0; }
+    .app-tile:hover .tile-actions, .app-tile:focus-within .tile-actions { opacity: 1; }
+    @media (hover: none) { .tile-actions { opacity: 1; } }
   </style>
 </head>
 <body class="bg-slate-100/50 text-slate-800 font-sans selection:bg-indigo-100 min-h-screen flex flex-col overflow-hidden">
@@ -77,7 +88,7 @@
         <div id="home-tools" class="flex items-center gap-2">
           <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2">
             <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-slate-400 mr-1"></i>
-            <select id="sort-select" class="bg-transparent text-xs text-slate-600 py-2 focus:outline-none cursor-pointer">
+            <select id="sort-select" aria-label="並び順" class="bg-transparent text-xs text-slate-600 py-2 focus:outline-none cursor-pointer">
               <option value="date-asc">登録日 (旧)</option>
               <option value="date-desc">登録日 (新)</option>
               <option value="name-asc">名前 (昇順)</option>
@@ -110,6 +121,7 @@
     <!-- グリッド表示（ホーム） -->
     <div id="main-view" class="absolute inset-0 overflow-y-auto p-6 md:p-10 z-10 transition-opacity duration-200">
       <div class="max-w-[1600px] mx-auto">
+        <p class="text-xs text-slate-500 mb-5">端にドラッグして並び替え、中央に重ねてグループ化。タイルの「移動」メニューからも配置できます。</p>
         <div id="app-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 sm:gap-6">
           <!-- アプリタイル -->
         </div>
@@ -128,6 +140,49 @@
   <!-- ====================
        モーダル群
   ==================== -->
+
+  <!-- グループ内のアプリ -->
+  <div id="group-modal" role="dialog" aria-modal="true" aria-label="アプリグループ" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[90] items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="p-5 border-b flex items-center gap-3">
+        <form id="group-name-form" class="flex flex-1 items-center gap-2 min-w-0">
+          <label class="sr-only" for="group-name">グループ名</label>
+          <input id="group-name" maxlength="80" required class="text-lg font-bold border rounded-lg px-3 py-2 w-full min-w-0" />
+          <button class="shrink-0 text-sm text-indigo-600 px-2 py-2 rounded-lg hover:bg-indigo-50">名前を保存</button>
+        </form>
+        <button id="btn-close-group" aria-label="グループを閉じる" class="p-2 rounded-lg hover:bg-slate-100"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto">
+        <p class="text-xs text-slate-500 mb-4">端にドラッグしてグループ内を並び替え。ホームに戻すには「移動」メニューを使うか、下の枠にドロップしてください。</p>
+        <div id="group-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+        <div id="group-home-drop" class="mt-5 p-4 rounded-xl border-2 border-dashed border-indigo-200 text-center text-sm text-indigo-600">ここにドロップしてホームの最後へ移動</div>
+      </div>
+      <div class="p-4 border-t flex justify-between items-center gap-3">
+        <span id="group-count" class="text-xs text-slate-500" aria-live="polite"></span>
+        <button id="btn-ungroup" class="px-4 py-2 text-sm text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg">グループを解除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- タッチ・キーボードでも使える配置メニュー -->
+  <div id="move-modal" role="dialog" aria-modal="true" aria-labelledby="move-title" class="fixed inset-0 bg-slate-900/60 z-[105] items-center justify-center p-4 hidden">
+    <div class="bg-white p-6 rounded-3xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <h3 id="move-title" class="text-lg font-bold mb-4">移動・グループ化</h3>
+      <form id="move-form" class="flex flex-col gap-3">
+        <label for="move-destination" class="text-sm font-semibold">移動先</label>
+        <select id="move-destination" class="border rounded-lg p-2"></select>
+        <label for="move-position" class="text-sm font-semibold">配置する位置</label>
+        <select id="move-position" class="border rounded-lg p-2"></select>
+        <button class="bg-indigo-600 text-white rounded-lg p-2">この位置へ移動</button>
+      </form>
+      <div id="move-stack-section" class="mt-5 pt-4 border-t flex flex-col gap-3">
+        <label for="move-stack-target" class="text-sm font-semibold">別のアプリと新しいグループを作る</label>
+        <select id="move-stack-target" class="border rounded-lg p-2"></select>
+        <button id="btn-move-stack" class="bg-indigo-50 text-indigo-700 rounded-lg p-2">グループを作成</button>
+      </div>
+      <button id="btn-close-move" class="mt-4 w-full text-slate-600 rounded-lg p-2 hover:bg-slate-100">閉じる</button>
+    </div>
+  </div>
 
   <!-- エディタモーダル -->
   <div id="editor-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] items-center justify-center p-4 hidden animate-fade-in">
@@ -392,8 +447,8 @@
           const tx = db.transaction(STORE_NAME, 'readonly');
           const store = tx.objectStore(STORE_NAME);
           const request = store.get(key);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          request.onsuccess = () => { db.close(); resolve(request.result); };
+          request.onerror = () => { db.close(); reject(request.error); };
         });
       } catch (e) {
         console.warn("IndexedDB GET error", e);
@@ -407,7 +462,8 @@
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const request = store.put(value, key);
-        request.onsuccess = () => resolve();
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onabort = () => { db.close(); reject(tx.error || new Error('保存を中断しました')); };
         request.onerror = () => reject(request.error);
       });
     }
@@ -417,9 +473,12 @@
     let openAppIds = [];
     let activeTabId = 'home';
     let sortOption = 'date-asc';
-    let draggingAppId = null;
+    let draggingEntry = null;
     let isInternalAppDrag = false;
-    let dropInsertIndex = null;
+    let layout = { home: [], groups: [] };
+    let activeGroupId = null;
+    let movingEntry = null;
+    let saveQueue = Promise.resolve();
     let forceEnableSaveAfterRestore = false;
 
     // エディタ状態管理
@@ -639,181 +698,407 @@ export default function App() {
       return colors[Math.abs(hash) % colors.length];
     };
 
-    // --- 初期化 ---
-    async function init() {
-      // IndexedDB からデータを取得
-      let savedData = await idbGet('webapp_hub_data');
+    // 配置はアプリ本体と分けて管理し、表示順・グループを一緒に保存する。
+    const SORT_OPTIONS = ['custom', 'name-asc', 'name-desc', 'date-asc', 'date-desc'];
+    const appEntry = id => ({ type: 'app', id });
+    const groupEntry = id => ({ type: 'group', id });
+    const sameEntry = (a, b) => a.type === b.type && a.id === b.id;
+    const findGroup = id => layout.groups.find(group => group.id === id);
+    const entryData = entry => entry.type === 'group' ? findGroup(entry.id) : apps.find(app => app.id === entry.id);
+    const entriesIn = groupId => groupId ? (findGroup(groupId)?.appIds || []).map(appEntry) : layout.home;
 
-      // IndexedDBにデータがない場合、過去のlocalStorageから移行を試みる
-      if (!savedData) {
-        const lsData = localStorage.getItem('webapp_hub_data');
-        if (lsData) {
-          try {
-            savedData = JSON.parse(lsData);
-            // 移行成功したら IndexedDB に保存しておく
-            await idbSet('webapp_hub_data', savedData);
-          } catch(e) {}
+    function sortedEntries(entries, option = sortOption, lookup = entryData) {
+      return [...entries].sort((a, b) => {
+        const left = lookup(a), right = lookup(b);
+        if (option === 'name-asc') return left.name.localeCompare(right.name, 'ja');
+        if (option === 'name-desc') return right.name.localeCompare(left.name, 'ja');
+        if (option === 'date-asc') return (left.createdAt || 0) - (right.createdAt || 0);
+        if (option === 'date-desc') return (right.createdAt || 0) - (left.createdAt || 0);
+        return 0;
+      });
+    }
+
+    // 古いバックアップや削除・追加の後も、各アプリを必ず一か所に配置する。
+    function normalizeLayout(source, appList) {
+      const ids = new Set(appList.map(app => app.id));
+      const used = new Set();
+      const groups = (source?.groups || []).map(group => ({
+        id: group.id, name: group.name, createdAt: group.createdAt || 0,
+        appIds: group.appIds.filter(id => {
+          if (!ids.has(id) || used.has(id)) return false;
+          used.add(id);
+          return true;
+        })
+      })).filter(group => group.appIds.length);
+      const groupIds = new Set(groups.map(group => group.id));
+      const home = [];
+      for (const entry of source?.home || []) {
+        if (entry.type === 'app' && ids.has(entry.id) && !used.has(entry.id)) {
+          used.add(entry.id); home.push(appEntry(entry.id));
+        } else if (entry.type === 'group' && groupIds.delete(entry.id)) {
+          home.push(groupEntry(entry.id));
         }
       }
+      groups.forEach(group => { if (groupIds.has(group.id)) home.push(groupEntry(group.id)); });
+      appList.forEach(app => { if (!used.has(app.id)) home.push(appEntry(app.id)); });
+      return { home, groups };
+    }
 
-      if (savedData && Array.isArray(savedData)) {
-        try {
-            apps = savedData.map(app => ({
-                ...app,
-                codeType: app.codeType || 'html',
-                sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
-                html: (app.codeType || 'html') === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
-                history: app.history || [],
-                githubUrl: app.githubUrl || ''
-            }));
-        } catch (e) { console.error('Data error'); }
+    function readBackup(data) {
+      const legacy = Array.isArray(data);
+      if (!legacy && (!data || data.version !== 2 || !Array.isArray(data.apps))) throw new Error('未対応のバックアップ形式です。');
+      const rawApps = legacy ? data : data.apps;
+      const ids = new Set();
+      const parsedApps = rawApps.map(app => {
+        if (!app || typeof app.name !== 'string' || !app.name.trim() || typeof app.html !== 'string' ||
+            (app.sourceCode !== undefined && typeof app.sourceCode !== 'string') ||
+            (app.imageUrl !== undefined && typeof app.imageUrl !== 'string')) throw new Error('アプリのデータが不正です。');
+        let id = app.id;
+        if (typeof id !== 'string' || !id || ids.has(id)) {
+          if (!legacy) throw new Error('アプリIDが不正または重複しています。');
+          id = generateId();
+        }
+        ids.add(id);
+        return {
+          ...app, id, codeType: app.codeType === 'react' ? 'react' : 'html',
+          sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
+          html: app.codeType === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
+          history: Array.isArray(app.history) ? app.history : [], githubUrl: app.githubUrl || ''
+        };
+      });
+      if (!legacy) {
+        const value = data.layout;
+        if (!value || !Array.isArray(value.home) || !Array.isArray(value.groups)) throw new Error('配置データが不正です。');
+        for (const group of value.groups) {
+          if (!group || typeof group.id !== 'string' || !group.id || ids.has(group.id) ||
+              typeof group.name !== 'string' || !group.name.trim() || !Array.isArray(group.appIds) ||
+              group.appIds.some(id => typeof id !== 'string')) throw new Error('グループのデータが不正です。');
+          ids.add(group.id);
+        }
+        if (value.home.some(entry => !entry || !['app', 'group'].includes(entry.type) || typeof entry.id !== 'string')) throw new Error('配置データが不正です。');
       }
+      return {
+        apps: parsedApps, layout: normalizeLayout(legacy ? null : data.layout, parsedApps),
+        sortOption: !legacy && SORT_OPTIONS.includes(data.sortOption) ? data.sortOption : 'custom',
+        tabDisplayMode: !legacy && data.settings?.tabDisplayMode === 'icon-only' ? 'icon-only' : 'full'
+      };
+    }
 
-      const savedSort = localStorage.getItem('webapp_hub_sort');
-      if (savedSort) {
-        sortOption = savedSort;
-        sortSelect.value = sortOption;
-      }
-      const savedSettings = localStorage.getItem('webapp_hub_settings');
-      if (savedSettings) {
-        try {
-          const config = JSON.parse(savedSettings);
-          tabDisplayMode = config.tabDisplayMode || 'full';
-        } catch(e) {}
-      }
+    // 自動ソートから動かした時は、画面上の順序を手動配置の出発点にする。
+    function useVisibleOrder() {
+      layout.home = sortedEntries(layout.home);
+      layout.groups.forEach(group => { group.appIds = sortedEntries(group.appIds.map(appEntry)).map(entry => entry.id); });
+      sortOption = 'custom';
+      sortSelect.value = sortOption;
+    }
 
-      renderGrid();
+    function removeEntry(entry) {
+      layout.home = layout.home.filter(item => !sameEntry(item, entry));
+      if (entry.type === 'app') layout.groups.forEach(group => { group.appIds = group.appIds.filter(id => id !== entry.id); });
+    }
 
-      // 初期ロード時にハッシュパラメータをチェックし、タブを合わせる
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const tabFromHash = hashParams.get('tab');
-
-      if (tabFromHash && apps.find(a => a.id === tabFromHash)) {
-          switchTab(tabFromHash, true);
+    async function moveEntry(entry, destinationId, before = null) {
+      if (!entryData(entry) || (destinationId && (entry.type === 'group' || !findGroup(destinationId)))) return;
+      if (before && sameEntry(entry, before)) return;
+      useVisibleOrder();
+      removeEntry(entry);
+      if (destinationId) {
+        const ids = findGroup(destinationId).appIds;
+        const index = before ? ids.indexOf(before.id) : -1;
+        ids.splice(index < 0 ? ids.length : index, 0, entry.id);
       } else {
-          switchTab('home', true);
+        const index = before ? layout.home.findIndex(item => sameEntry(item, before)) : -1;
+        layout.home.splice(index < 0 ? layout.home.length : index, 0, entry);
       }
+      await persistLayout();
+    }
 
+    async function stackApp(sourceId, target) {
+      if (!apps.some(app => app.id === sourceId) || (target.type === 'app' && target.id === sourceId) || !entryData(target)) return;
+      if (target.type === 'group') return moveEntry(appEntry(sourceId), target.id);
+      useVisibleOrder();
+      // 作成するグループは、重ね先のアプリがあったホーム位置へ置く。
+      const parent = layout.groups.find(group => group.appIds.includes(target.id));
+      const anchor = parent ? groupEntry(parent.id) : target;
+      removeEntry(appEntry(sourceId));
+      const index = layout.home.findIndex(entry => sameEntry(entry, anchor));
+      removeEntry(target);
+      const group = { id: generateId(), name: '新しいグループ', createdAt: Date.now(), appIds: [target.id, sourceId] };
+      layout.groups.push(group);
+      layout.home.splice(index < 0 ? layout.home.length : index, 0, groupEntry(group.id));
+      await persistLayout();
+    }
+
+    async function persistLayout() {
+      layout = normalizeLayout(layout, apps);
+      renderGrid();
+      await saveData();
+    }
+
+    async function init() {
+      let savedData = await idbGet('webapp_hub_data');
+      if (!savedData) {
+        try { savedData = JSON.parse(localStorage.getItem('webapp_hub_data') || 'null'); } catch (e) { console.warn('旧データの読み込みに失敗しました', e); }
+      }
+      if (savedData) {
+        try {
+          const state = readBackup(savedData);
+          apps = state.apps;
+          layout = state.layout;
+          sortOption = state.sortOption;
+          tabDisplayMode = state.tabDisplayMode;
+          if (Array.isArray(savedData)) {
+            const oldSort = localStorage.getItem('webapp_hub_sort');
+            if (SORT_OPTIONS.includes(oldSort)) sortOption = oldSort;
+            try { tabDisplayMode = JSON.parse(localStorage.getItem('webapp_hub_settings') || '{}').tabDisplayMode || 'full'; } catch (e) {}
+          }
+        } catch (e) {
+          console.error('Data error', e);
+          showAlert('保存データを読み込めませんでした。バックアップを確認してください。');
+        }
+      }
+      sortSelect.value = sortOption;
+      renderGrid();
+      const tabFromHash = new URLSearchParams(window.location.hash.substring(1)).get('tab');
+      switchTab(apps.some(app => app.id === tabFromHash) ? tabFromHash : 'home', true);
       updateSettingsUI();
       lucide.createIcons();
     }
 
     async function saveData() {
+      layout = normalizeLayout(layout, apps);
+      const snapshot = structuredClone({ version: 2, apps, layout, sortOption, settings: { tabDisplayMode } });
+      // 同時保存も呼び出し順に完了させ、古い状態の書き戻しを防ぐ。
+      const pending = saveQueue.then(() => idbSet('webapp_hub_data', snapshot));
+      saveQueue = pending.catch(() => {});
       try {
-        await idbSet('webapp_hub_data', apps);
+        await pending;
+        return true;
       } catch (e) {
-        console.error("Data save error:", e);
+        console.error('Data save error:', e);
         showAlert('データの保存に失敗しました。デバイスの空き容量を確認してください。');
+        return false;
       }
-      localStorage.setItem('webapp_hub_sort', sortOption);
-      localStorage.setItem('webapp_hub_settings', JSON.stringify({ tabDisplayMode }));
     }
 
-    // --- レンダリング系 ---
-    function renderGrid() {
-      const sortedApps = [...apps].sort((a, b) => {
-        if (sortOption === 'custom') return 0;
-        if (sortOption === 'name-asc') return a.name.localeCompare(b.name, 'ja');
-        if (sortOption === 'name-desc') return b.name.localeCompare(a.name, 'ja');
-        if (sortOption === 'date-asc') return (a.createdAt || 0) - (b.createdAt || 0);
-        if (sortOption === 'date-desc') return (b.createdAt || 0) - (a.createdAt || 0);
-        return 0;
-      });
+    // --- ホーム・グループの描画と配置操作 ---
+    function appIcon(app, small = false) {
+      const size = small ? 'w-full h-full text-xs' : 'w-16 h-16 sm:w-20 sm:h-20 text-2xl';
+      const background = app.imageUrl ? 'bg-slate-50' : `bg-gradient-to-br ${getColorFromName(app.name)} text-white`;
+      const content = app.imageUrl
+        ? `<img src="${escapeHTML(app.imageUrl)}" alt="" draggable="false" class="w-full h-full object-cover" />`
+        : escapeHTML(app.name.substring(0, 2).toUpperCase());
+      return `<div class="${size} rounded-2xl ${background} flex items-center justify-center font-bold overflow-hidden">${content}</div>`;
+    }
 
-      gridContainer.innerHTML = '';
+    function clearDropHints() {
+      document.querySelectorAll('.drop-before, .drop-after, .drop-stack').forEach(tile => tile.classList.remove('drop-before', 'drop-after', 'drop-stack'));
+    }
 
-      const addBtn = document.createElement('button');
-      addBtn.className = "aspect-square flex flex-col items-center justify-center gap-4 rounded-3xl bg-white border-2 border-dashed border-slate-200 text-slate-400 hover:border-indigo-400 hover:text-indigo-600 transition-all group shadow-sm";
-      addBtn.onclick = () => openEditor();
-      addBtn.innerHTML = `
-        <div class="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-indigo-50 group-hover:scale-110 transition-all duration-300">
-          <i data-lucide="plus" class="w-8 h-8" stroke-width="2.5"></i>
+    function finishTileDrag() {
+      isInternalAppDrag = false;
+      draggingEntry = null;
+      clearDropHints();
+    }
+
+    function dropAction(event, tile, target, groupId) {
+      const rect = tile.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top) / rect.height;
+      if (!groupId && draggingEntry?.type === 'app' && x > 0.25 && x < 0.75 && y > 0.2 && y < 0.8) return 'stack';
+      return x < 0.5 ? 'before' : 'after';
+    }
+
+    function makeTile(entry, groupId = null) {
+      const data = entryData(entry);
+      const isGroup = entry.type === 'group';
+      const tile = document.createElement('div');
+      tile.className = 'app-tile aspect-square relative group rounded-3xl bg-white shadow-sm hover:shadow-xl border border-slate-100 transition-shadow cursor-pointer flex flex-col items-center justify-center p-4';
+      tile.draggable = true;
+      tile.tabIndex = 0;
+      tile.setAttribute('role', 'button');
+      tile.setAttribute('aria-label', `${isGroup ? 'グループ' : 'アプリ'}: ${data.name}`);
+      tile.dataset.entryId = entry.id;
+      tile.dataset.entryType = entry.type;
+      if (!isGroup) tile.dataset.appId = entry.id;
+      const icon = isGroup
+        ? `<div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-indigo-50 border border-indigo-100 grid grid-cols-2 grid-rows-2 gap-1 p-2 overflow-hidden">${data.appIds.slice(0, 4).map(id => appIcon(apps.find(app => app.id === id), true)).join('')}</div>`
+        : appIcon(data);
+      tile.innerHTML = `
+        <div class="tile-actions absolute top-1 right-1 flex gap-1 z-10">
+          <button type="button" class="btn-move p-1.5 bg-white/95 rounded-lg text-slate-600 border shadow-sm" title="移動・グループ化" aria-label="移動・グループ化"><i data-lucide="move" class="w-3.5 h-3.5"></i></button>
+          <button type="button" class="btn-edit p-1.5 bg-white/95 rounded-lg text-slate-600 border shadow-sm" title="${isGroup ? 'グループ名を変更' : 'アプリを編集'}" aria-label="${isGroup ? 'グループ名を変更' : 'アプリを編集'}"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
+          ${isGroup ? '' : '<button type="button" class="btn-delete p-1.5 bg-white/95 rounded-lg text-slate-600 border shadow-sm" title="アプリを削除" aria-label="アプリを削除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>'}
         </div>
-        <span class="font-bold text-xs uppercase tracking-widest">アプリを追加</span>
-      `;
-      gridContainer.appendChild(addBtn);
-
-      sortedApps.forEach(app => {
-        const tile = document.createElement('div');
-        tile.className = "aspect-square relative group rounded-3xl bg-white shadow-sm hover:shadow-xl border border-slate-100 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center p-4 hover:-translate-y-1";
-        tile.onclick = () => switchTab(app.id);
-        tile.draggable = true;
-        tile.dataset.appId = app.id;
-
-        let iconContent = app.imageUrl
-          ? `<img src="${escapeHTML(app.imageUrl)}" class="w-full h-full object-cover" />`
-          : app.name.substring(0, 2).toUpperCase();
-        const bgClass = app.imageUrl ? 'bg-slate-50' : `bg-gradient-to-br ${getColorFromName(app.name)} text-white`;
-
-        const badge = app.codeType === 'react'
-            ? `<div class="absolute top-3 left-3 bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm z-10"><i data-lucide="file-json" class="w-2.5 h-2.5 inline mr-0.5"></i>React</div>`
-            : '';
-
-        tile.innerHTML = `
-          ${badge}
-          <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-            <button class="btn-edit p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-blue-600 border border-slate-100 shadow-sm"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
-            <button class="btn-delete p-1.5 bg-white/90 rounded-xl text-slate-500 hover:text-red-600 border border-slate-100 shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-          </div>
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl ${bgClass} flex items-center justify-center text-2xl font-bold shadow-lg mb-3 ring-4 ring-white overflow-hidden group-hover:scale-105 transition-transform">
-            ${iconContent}
-          </div>
-          <h3 class="font-bold text-slate-800 text-center w-full truncate px-2 text-xs sm:text-sm">${escapeHTML(app.name)}</h3>
-        `;
-
-        tile.querySelector('.btn-edit').onclick = (e) => { e.stopPropagation(); openEditor(app); };
-        tile.querySelector('.btn-delete').onclick = (e) => { e.stopPropagation(); requestDelete(app); };
-        tile.ondragstart = (e) => {
-          isInternalAppDrag = true;
-          draggingAppId = app.id;
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', app.id);
-          tile.classList.add('opacity-50');
-        };
-        tile.ondragend = () => {
-          isInternalAppDrag = false;
-          draggingAppId = null;
-          dropInsertIndex = null;
-          tile.classList.remove('opacity-50');
-          document.getElementById('app-drop-marker')?.remove();
-        };
-        tile.ondragover = (e) => {
-          e.preventDefault();
-          if (!draggingAppId || draggingAppId === app.id) return;
-          const rect = tile.getBoundingClientRect();
-          const insertAfter = e.clientY > rect.top + rect.height / 2;
-          const targetIndex = apps.findIndex(a => a.id === app.id);
-          dropInsertIndex = insertAfter ? targetIndex + 1 : targetIndex;
-          let marker = document.getElementById('app-drop-marker');
-          if (!marker) {
-            marker = document.createElement('div');
-            marker.id = 'app-drop-marker';
-            marker.className = "aspect-square flex items-center justify-center pointer-events-none";
-            marker.innerHTML = '<div class="w-1 h-16 bg-indigo-500 rounded-full shadow-lg"></div>';
-          }
-          gridContainer.insertBefore(marker, insertAfter ? tile.nextSibling : tile);
-        };
-        tile.ondragleave = () => {};
-        tile.ondrop = async (e) => {
-          e.preventDefault();
-          const fromId = draggingAppId;
-          if (!fromId || dropInsertIndex === null) return;
-          const fromIndex = apps.findIndex(a => a.id === fromId);
-          if (fromIndex < 0) return;
-          const moved = apps.splice(fromIndex, 1)[0];
-          const insertIndex = fromIndex < dropInsertIndex ? dropInsertIndex - 1 : dropInsertIndex;
-          apps.splice(insertIndex, 0, moved);
-          dropInsertIndex = null;
-          sortOption = 'custom';
-          sortSelect.value = 'custom';
-          await saveData();
-          renderGrid();
-        };
-
-        gridContainer.appendChild(tile);
-      });
-      lucide.createIcons({ root: gridContainer });
+        <div class="mb-3 shadow-sm rounded-2xl">${icon}</div>
+        <h3 class="font-bold text-slate-800 text-center w-full truncate text-xs sm:text-sm">${escapeHTML(data.name)}</h3>
+        ${isGroup ? `<span class="text-[10px] text-indigo-500 mt-1">${data.appIds.length}個のアプリ</span>` : ''}`;
+      const launch = () => {
+        if (isGroup) openGroup(entry.id);
+        else { closeGroup(); switchTab(entry.id); }
+      };
+      tile.onclick = launch;
+      tile.onkeydown = event => {
+        if (event.target === tile && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); launch(); }
+      };
+      tile.querySelector('.btn-move').onclick = event => { event.stopPropagation(); openMoveMenu(entry); };
+      tile.querySelector('.btn-edit').onclick = event => {
+        event.stopPropagation();
+        if (isGroup) { openGroup(entry.id); document.getElementById('group-name').focus(); }
+        else openEditor(data);
+      };
+      if (!isGroup) tile.querySelector('.btn-delete').onclick = event => { event.stopPropagation(); requestDelete(data); };
+      tile.ondragstart = event => {
+        if (event.target.closest('button')) { event.preventDefault(); return; }
+        isInternalAppDrag = true;
+        draggingEntry = { ...entry };
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', entry.id);
+        tile.classList.add('opacity-50');
+      };
+      tile.ondragend = () => { tile.classList.remove('opacity-50'); finishTileDrag(); };
+      tile.ondragover = event => {
+        if (!draggingEntry) return;
+        event.preventDefault(); event.stopPropagation();
+        clearDropHints();
+        if (sameEntry(draggingEntry, entry)) return;
+        event.dataTransfer.dropEffect = 'move';
+        tile.classList.add(`drop-${dropAction(event, tile, entry, groupId)}`);
+      };
+      tile.ondragleave = event => { if (!tile.contains(event.relatedTarget)) clearDropHints(); };
+      tile.ondrop = async event => {
+        if (!draggingEntry) return;
+        event.preventDefault(); event.stopPropagation();
+        const source = { ...draggingEntry };
+        const action = dropAction(event, tile, entry, groupId);
+        finishTileDrag();
+        if (sameEntry(source, entry)) return;
+        if (action === 'stack') await stackApp(source.id, entry);
+        else {
+          const entries = sortedEntries(entriesIn(groupId));
+          const index = entries.findIndex(item => sameEntry(item, entry));
+          const before = action === 'after' ? entries[index + 1] || null : entry;
+          await moveEntry(source, groupId, before);
+        }
+      };
+      return tile;
     }
+
+    function renderGrid() {
+      layout = normalizeLayout(layout, apps);
+      gridContainer.innerHTML = '';
+      const addButton = document.createElement('button');
+      addButton.id = 'btn-add-app';
+      addButton.className = 'aspect-square flex flex-col items-center justify-center gap-4 rounded-3xl bg-white border-2 border-dashed border-slate-200 text-slate-500 hover:border-indigo-400 hover:text-indigo-600';
+      addButton.onclick = () => openEditor();
+      addButton.innerHTML = '<i data-lucide="plus" class="w-8 h-8"></i><span class="font-bold text-xs">アプリを追加</span>';
+      gridContainer.appendChild(addButton);
+      sortedEntries(layout.home).forEach(entry => gridContainer.appendChild(makeTile(entry)));
+      lucide.createIcons({ root: gridContainer });
+      if (activeGroupId && findGroup(activeGroupId)) renderGroup();
+      else closeGroup();
+    }
+
+    function openGroup(id) {
+      if (!findGroup(id)) return;
+      activeGroupId = id;
+      renderGroup();
+      openModal(document.getElementById('group-modal'));
+      document.getElementById('btn-close-group').focus();
+    }
+
+    function closeGroup() {
+      activeGroupId = null;
+      closeModal(document.getElementById('group-modal'));
+    }
+
+    function renderGroup() {
+      const group = findGroup(activeGroupId);
+      document.getElementById('group-name').value = group.name;
+      document.getElementById('group-count').textContent = `${group.appIds.length}個のアプリ`;
+      const grid = document.getElementById('group-grid');
+      grid.innerHTML = '';
+      sortedEntries(entriesIn(group.id)).forEach(entry => grid.appendChild(makeTile(entry, group.id)));
+      lucide.createIcons({ root: document.getElementById('group-modal') });
+    }
+
+    document.getElementById('btn-close-group').onclick = closeGroup;
+    document.getElementById('group-modal').onclick = event => { if (event.target.id === 'group-modal') closeGroup(); };
+    document.getElementById('group-name-form').onsubmit = async event => {
+      event.preventDefault();
+      const name = document.getElementById('group-name').value.trim();
+      const group = findGroup(activeGroupId);
+      if (!name || !group) return;
+      group.name = name;
+      await persistLayout();
+    };
+    document.getElementById('btn-ungroup').onclick = async () => {
+      const group = findGroup(activeGroupId);
+      if (!group) return;
+      useVisibleOrder();
+      const index = layout.home.findIndex(entry => entry.type === 'group' && entry.id === group.id);
+      layout.home.splice(index, 1, ...group.appIds.map(appEntry));
+      layout.groups = layout.groups.filter(item => item.id !== group.id);
+      closeGroup();
+      await persistLayout();
+    };
+
+    function allowContainerDrop(container, destination) {
+      container.addEventListener('dragover', event => {
+        if (!draggingEntry || (destination() && draggingEntry.type === 'group')) return;
+        event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+      });
+      container.addEventListener('drop', async event => {
+        if (!draggingEntry) return;
+        event.preventDefault(); event.stopPropagation();
+        const entry = { ...draggingEntry };
+        finishTileDrag();
+        await moveEntry(entry, destination());
+      });
+    }
+    allowContainerDrop(gridContainer, () => null);
+    allowContainerDrop(document.getElementById('group-grid'), () => activeGroupId);
+    allowContainerDrop(document.getElementById('group-home-drop'), () => null);
+
+    function updateMovePositions() {
+      const destination = document.getElementById('move-destination').value || null;
+      const select = document.getElementById('move-position');
+      select.replaceChildren();
+      sortedEntries(entriesIn(destination)).filter(entry => !sameEntry(entry, movingEntry)).forEach(entry => {
+        select.add(new Option(`「${entryData(entry).name}」の前`, JSON.stringify(entry)));
+      });
+      select.add(new Option('最後', ''));
+    }
+
+    function openMoveMenu(entry) {
+      movingEntry = { ...entry };
+      document.getElementById('move-title').textContent = `「${entryData(entry).name}」を移動`;
+      const select = document.getElementById('move-destination');
+      select.replaceChildren(new Option('ホーム', ''));
+      if (entry.type === 'app') layout.groups.forEach(group => select.add(new Option(group.name, group.id)));
+      select.value = entry.type === 'app' ? layout.groups.find(group => group.appIds.includes(entry.id))?.id || '' : '';
+      updateMovePositions();
+      const target = document.getElementById('move-stack-target');
+      target.replaceChildren();
+      apps.filter(app => app.id !== entry.id).forEach(app => target.add(new Option(app.name, app.id)));
+      document.getElementById('move-stack-section').classList.toggle('hidden', entry.type !== 'app' || !target.options.length);
+      openModal(document.getElementById('move-modal'));
+      select.focus();
+    }
+    document.getElementById('move-destination').onchange = updateMovePositions;
+    document.getElementById('move-form').onsubmit = async event => {
+      event.preventDefault();
+      const before = document.getElementById('move-position').value;
+      await moveEntry(movingEntry, document.getElementById('move-destination').value || null, before ? JSON.parse(before) : null);
+      closeModal(document.getElementById('move-modal'));
+    };
+    document.getElementById('btn-move-stack').onclick = async () => {
+      const target = document.getElementById('move-stack-target').value;
+      if (!target || movingEntry?.type !== 'app') return;
+      await stackApp(movingEntry.id, appEntry(target));
+      closeModal(document.getElementById('move-modal'));
+    };
+    document.getElementById('btn-close-move').onclick = () => closeModal(document.getElementById('move-modal'));
 
     function renderTabs() {
       tabContainer.innerHTML = '';
@@ -878,6 +1163,7 @@ export default function App() {
 
     // --- タブ・Iframe管理 ---
     function switchTab(id, skipHistory = false) {
+      if (id !== 'home') closeGroup();
       if (id !== 'home' && !openAppIds.includes(id)) {
         const app = apps.find(a => a.id === id);
         if (!app) {
@@ -1720,6 +2006,8 @@ ${getGeneratedLucideRuntime()}
       document.getElementById('confirm-msg').textContent = '登録されたすべてのアプリと設定が削除され、完全に初期状態に戻ります。本当によろしいですか？';
       confirmCallback = async () => {
         apps = [];
+        layout = { home: [], groups: [] };
+        closeGroup();
         [...openAppIds].forEach(id => closeTab(id));
         activeTabId = 'home';
         sortOption = 'date-asc';
@@ -1839,13 +2127,14 @@ ${getGeneratedLucideRuntime()}
           ? `<img src="${escapeHTML(app.imageUrl)}" class="w-10 h-10 rounded-lg object-cover" />`
           : `<div class="w-10 h-10 rounded-lg bg-gradient-to-br ${getColorFromName(app.name)} text-white flex items-center justify-center text-xs font-bold">${escapeHTML(app.name.substring(0, 2).toUpperCase())}</div>`;
         card.innerHTML = `
-          <input type="checkbox" class="export-app-checkbox hidden" value="${app.id}" checked>
+          <input type="checkbox" class="export-app-checkbox hidden" checked>
           <div class="absolute top-1 right-1 w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center">✓</div>
           <div class="flex items-center gap-2">
             ${icon}
             <span class="text-xs text-slate-700 truncate">${escapeHTML(app.name)}</span>
           </div>
         `;
+        card.querySelector('.export-app-checkbox').value = app.id;
         card.onclick = () => {
           const cb = card.querySelector('.export-app-checkbox');
           cb.checked = !cb.checked;
@@ -1895,11 +2184,17 @@ ${getGeneratedLucideRuntime()}
         showAlert('エクスポートするアプリを1つ以上選択してください。');
         return;
       }
-      const blob = new Blob([JSON.stringify(selectedApps, null, 2)], {type: 'application/json'});
+      // 選択したアプリだけを残し、ホーム順・グループ内順・ソート設定も含める。
+      const backup = {
+        version: 2, apps: selectedApps, layout: normalizeLayout(layout, selectedApps),
+        sortOption, settings: { tabDisplayMode }
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `webapp_hub_backup_${new Date().toISOString().slice(0,10)}.json`;
       a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       closeModal(document.getElementById('export-modal'));
     };
     document.getElementById('btn-import').onclick = () => document.getElementById('import-file-input').click();
@@ -1910,30 +2205,57 @@ ${getGeneratedLucideRuntime()}
       reader.onload = (ev) => {
         try {
           const data = JSON.parse(ev.target.result);
-          if (!Array.isArray(data)) throw new Error();
-
-          importPendingData = data.map(app => ({
-              ...app,
-              codeType: app.codeType || 'html',
-              sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
-              html: (app.codeType || 'html') === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
-              history: app.history || [],
-              githubUrl: app.githubUrl || ''
-          }));
-
-          document.getElementById('import-msg').textContent = `${data.length} 件のデータが見つかりました。`;
+          importPendingData = readBackup(data);
+          document.getElementById('import-msg').textContent = `${importPendingData.apps.length} 件のアプリ、${importPendingData.layout.groups.length} 件のグループが見つかりました。上書きすると配置と並び順の設定も復元します。`;
           openModal(document.getElementById('import-modal'));
-        } catch(e) { showAlert('不正なファイルです。JSON形式であるか確認してください。'); }
+        } catch(e) { importPendingData = null; showAlert('不正なファイルです。JSON形式とデータの内容を確認してください。'); }
       };
       reader.readAsText(file);
       e.target.value = ''; // 連続で同じファイルをインポートできるようにリセット
     };
 
-    document.getElementById('btn-import-append').onclick = async () => { apps = [...apps, ...importPendingData]; await saveData(); renderGrid(); closeModal(document.getElementById('import-modal')); };
-    document.getElementById('btn-import-overwrite').onclick = async () => { apps = importPendingData; [...openAppIds].forEach(id => closeTab(id)); await saveData(); renderGrid(); closeModal(document.getElementById('import-modal')); };
-    document.getElementById('btn-import-cancel').onclick = () => closeModal(document.getElementById('import-modal'));
+    document.getElementById('btn-import-append').onclick = async () => {
+      if (!importPendingData) return;
+      const imported = importPendingData;
+      useVisibleOrder();
+      // 同じバックアップを繰り返し追加しても、タブや所属を混同しない。
+      const idMap = new Map();
+      [...imported.apps, ...imported.layout.groups].forEach(item => idMap.set(item.id, generateId()));
+      const remapEntry = entry => ({ type: entry.type, id: idMap.get(entry.id) });
+      const lookup = entry => entry.type === 'group'
+        ? imported.layout.groups.find(group => group.id === entry.id)
+        : imported.apps.find(app => app.id === entry.id);
+      apps.push(...imported.apps.map(app => ({ ...app, id: idMap.get(app.id) })));
+      layout.home.push(...sortedEntries(imported.layout.home, imported.sortOption, lookup).map(remapEntry));
+      layout.groups.push(...imported.layout.groups.map(group => ({
+        ...group, id: idMap.get(group.id),
+        appIds: sortedEntries(group.appIds.map(appEntry), imported.sortOption, lookup).map(entry => idMap.get(entry.id))
+      })));
+      await persistLayout();
+      importPendingData = null;
+      closeModal(document.getElementById('import-modal'));
+    };
+    document.getElementById('btn-import-overwrite').onclick = async () => {
+      if (!importPendingData) return;
+      [...openAppIds].forEach(id => closeTab(id));
+      closeGroup();
+      apps = importPendingData.apps;
+      layout = importPendingData.layout;
+      sortOption = importPendingData.sortOption;
+      tabDisplayMode = importPendingData.tabDisplayMode;
+      sortSelect.value = sortOption;
+      updateSettingsUI();
+      await persistLayout();
+      importPendingData = null;
+      closeModal(document.getElementById('import-modal'));
+    };
+    document.getElementById('btn-import-cancel').onclick = () => { importPendingData = null; closeModal(document.getElementById('import-modal')); };
 
     window.onkeydown = (e) => {
+      if (e.key === 'Escape') {
+        if (!document.getElementById('move-modal').classList.contains('hidden')) closeModal(document.getElementById('move-modal'));
+        else if (editorModal.classList.contains('hidden') && document.getElementById('confirm-modal').classList.contains('hidden')) closeGroup();
+      }
       if ((e.key === 'F5' || (e.ctrlKey && e.key === 'r')) && activeTabId !== 'home') {
         e.preventDefault(); reloadActiveApp();
       }
