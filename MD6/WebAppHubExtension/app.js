@@ -1,4 +1,4 @@
-import { $, readState } from './data.js';
+import { $, imageSource, readState } from './data.js';
 
 const id = new URLSearchParams(location.search).get('id');
 
@@ -11,6 +11,10 @@ async function start() {
   }
 
   document.title = entry.name;
+  const icon = document.createElement('link');
+  icon.rel = 'icon';
+  icon.href = imageSource(entry.imageUrl) || 'favicon.ico';
+  document.head.append(icon);
   $('app-name').textContent = entry.name;
   $('reload').hidden = false;
   $('reload').onclick = () => location.reload();
