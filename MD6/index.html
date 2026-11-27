@@ -315,7 +315,7 @@
 
   <!-- 設定モーダル -->
   <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[130] items-center justify-center p-4 hidden animate-fade-in">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-zoom-in">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-zoom-in">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
         <h2 class="text-xl font-bold text-slate-800 flex items-center gap-3">
           <i data-lucide="settings" class="w-5 h-5 text-slate-500"></i>
@@ -323,7 +323,7 @@
         </h2>
         <button id="btn-close-settings" class="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
       </div>
-      <div class="p-6 flex flex-col gap-6">
+      <div class="p-6 flex flex-col gap-6 overflow-y-auto">
         <!-- タブ表示モード -->
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-3">タブの表示モード</label>
@@ -335,13 +335,31 @@
 
         <hr class="border-slate-100">
 
+        <section aria-labelledby="github-token-title" class="flex flex-col gap-2 text-sm">
+          <h3 id="github-token-title" class="font-semibold">非公開 GitHub リポジトリ</h3>
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">GitHub で読み取り専用トークンを作成</a>
+          <p>対象リポジトリを選び、Contents を Read-only にして有効期限を設定してください。登録後は各アプリにファイルの URL を貼るだけで取得・更新できます。</p>
+          <p>トークンはこのブラウザーに保存され、Hub 内のアプリや外部ライブラリのコードから読まれる可能性があります。信頼できるアプリだけを開き、外部ライブラリは動作確認済みの版を使ってください。トークンはバックアップに含まれません。</p>
+          <form id="github-token-form" class="flex flex-col gap-2">
+            <label for="github-token-repo">リポジトリ（所有者/名前）</label>
+            <input id="github-token-repo" required placeholder="owner/repository" autocapitalize="none" spellcheck="false" class="rounded-lg border px-3 py-2" />
+            <label for="github-token-value">読み取り専用トークン</label>
+            <input id="github-token-value" required type="password" autocomplete="off" class="rounded-lg border px-3 py-2" />
+            <button class="self-start rounded-lg bg-indigo-600 px-3 py-2 text-white">トークンを登録・更新</button>
+          </form>
+          <p id="github-token-status" role="status"></p>
+          <ul id="github-token-list" class="flex flex-col gap-2"></ul>
+        </section>
+
+        <hr class="border-slate-100">
+
         <!-- リリース時の更新メモ（AI・開発者向け）
              MD6 を修正して GitHub に反映するたびに、下の表示バージョンを上げ、
              最終更新日（JST）も更新すること。 -->
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.9.5</span>
+            <span class="font-mono text-slate-800">1.9.6</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -525,6 +543,56 @@
     // 設定
     let tabDisplayMode = 'full';
 
+    const GITHUB_TOKENS_KEY = 'webapp_hub_github_tokens';
+
+    function readGithubTokens() {
+      try {
+        return new Map(JSON.parse(localStorage.getItem(GITHUB_TOKENS_KEY) || '[]'));
+      } catch {
+        return new Map();
+      }
+    }
+
+    async function fetchGithubSource(input) {
+      const url = new URL(input);
+      url.search = '';
+      url.hash = '';
+      const parts = url.pathname.slice(1).split('/').map(decodeURIComponent);
+      const [owner, repo, mode] = parts;
+      const githubFile = url.origin === 'https://github.com' && ['blob', 'raw'].includes(mode);
+      const rawFile = url.origin === 'https://raw.githubusercontent.com';
+      const token = githubFile || rawFile ? readGithubTokens().get(`${owner}/${repo}`.toLowerCase()) : null;
+      const isReact = /\.(jsx|tsx|js)$/i.test(parts.at(-1));
+
+      if (token) {
+        const refAndPath = parts.slice(githubFile ? 3 : 2);
+        // ブランチ名にもスラッシュを含められる。
+        for (let split = 1; split < refAndPath.length; split++) {
+          const path = refAndPath.slice(split);
+          if (path.some(part => !part || part === '.' || part === '..' || part.includes('/'))) continue;
+          const repository = [owner, repo].map(encodeURIComponent).join('/');
+          const api = new URL(`https://api.github.com/repos/${repository}/contents/${path.map(encodeURIComponent).join('/')}`);
+          api.searchParams.set('ref', refAndPath.slice(0, split).join('/'));
+          const response = await fetch(api, {
+            cache: 'no-store', redirect: 'error',
+            headers: { Accept: 'application/vnd.github.raw+json', Authorization: `Bearer ${token}` }
+          });
+          if (response.ok) return { text: await response.text(), isReact };
+          if (response.status !== 404) throw new Error(`GitHub API: HTTP ${response.status}`);
+        }
+        throw new Error('ファイルが見つかりません。URLとトークンの読み取り権限を確認してください。');
+      }
+
+      if (githubFile) {
+        url.hostname = 'raw.githubusercontent.com';
+        url.pathname = url.pathname.split('/').filter((_, index) => index !== 3).join('/');
+      }
+      url.searchParams.set('_t', Date.now());
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
+      return { text: await response.text(), isReact };
+    }
+
     // --- GitHub 同期共通ロジック ---
     async function syncGithubCode(appId, iconElement = null) {
         const app = apps.find(a => a.id === appId);
@@ -533,35 +601,8 @@
         if (iconElement) iconElement.classList.add('animate-spin');
 
         try {
-            // エディタの「取得」と同じ堅牢なURLパース
-            let url = app.githubUrl;
-            try {
-                const urlObj = new URL(url);
-                urlObj.search = ''; urlObj.hash = '';
-                if (urlObj.hostname === 'github.com') {
-                    const parts = urlObj.pathname.split('/');
-                    if (parts[3] === 'blob' || parts[3] === 'raw') {
-                        parts.splice(3, 1);
-                        urlObj.hostname = 'raw.githubusercontent.com';
-                        urlObj.pathname = parts.join('/');
-                    }
-                }
-                url = urlObj.toString();
-            } catch (e) {}
-
-            let fetchUrl = url;
-            try {
-                const u = new URL(url);
-                u.searchParams.set('_t', Date.now()); // キャッシュ回避
-                fetchUrl = u.toString();
-            } catch(e) {}
-
-            const response = await fetch(fetchUrl, { cache: 'no-store' });
-            if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
-            const sourceCode = await response.text();
-
-            // エディタの「保存して登録」と同じロジック
-            const isReact = url.match(/\.(jsx|tsx|js)$/i) || app.codeType === 'react';
+            const { text: sourceCode, isReact: reactFile } = await fetchGithubSource(app.githubUrl);
+            const isReact = reactFile || app.codeType === 'react';
             const saveCodeType = isReact ? 'react' : 'html';
 
             let runnableHtml = sourceCode;
@@ -956,11 +997,11 @@ export default function App() {
       clearDropHints();
     }
 
-    function dropAction(event, tile, groupId) {
+    function dropAction(event, tile, groupId, source = draggingEntry) {
       const rect = tile.getBoundingClientRect();
       const x = (event.clientX - rect.left) / rect.width;
       const y = (event.clientY - rect.top) / rect.height;
-      if (!groupId && draggingEntry?.type === 'app' && x > 0.25 && x < 0.75 && y > 0.2 && y < 0.8) return 'stack';
+      if (!groupId && source?.type === 'app' && x > 0.25 && x < 0.75 && y > 0.2 && y < 0.8) return 'stack';
       return x < 0.5 ? 'before' : 'after';
     }
 
@@ -987,33 +1028,89 @@ export default function App() {
       touchTileMenu.showModal();
     }
 
-    function bindTouchTileMenu(tile, data, isGroup) {
+    function entryPlacement(entry) {
+      const groupId = entry.type === 'app'
+        ? layout.groups.find(group => group.appIds.includes(entry.id))?.id : null;
+      return JSON.stringify([groupId || null, sortedEntries(entriesIn(groupId)).findIndex(item => sameEntry(item, entry))]);
+    }
+
+    async function dropOnTile(source, target, groupId, action) {
+      if (sameEntry(source, target)) return;
+      if (action === 'stack') {
+        await stackApp(source.id, target);
+      } else {
+        const entries = sortedEntries(entriesIn(groupId));
+        const index = entries.findIndex(item => sameEntry(item, target));
+        const before = action === 'after' ? entries[index + 1] || null : target;
+        await moveEntry(source, groupId, before);
+      }
+    }
+
+    function touchDropTarget(touch, source) {
+      const hit = document.elementFromPoint(touch.clientX, touch.clientY);
+      const tile = hit?.closest('.app-tile');
+      const inGroup = hit?.closest('#group-grid');
+      if (tile) {
+        const target = { id: tile.dataset.entryId, type: tile.dataset.entryType };
+        const groupId = inGroup ? activeGroupId : null;
+        if (sameEntry(source, target) || (groupId && source.type === 'group')) return null;
+        return { tile, target, groupId, action: dropAction(touch, tile, groupId, source) };
+      }
+      if (hit?.closest('#group-home-drop, #app-grid')) return { groupId: null };
+      if (inGroup && source.type === 'app') return { groupId: activeGroupId };
+      return null;
+    }
+
+    function bindTouchTileMenu(tile, entry, data, isGroup) {
       let press = null;
-      const cancel = () => { press = null; };
-      const moved = (touch, start) => Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 10;
+      const cancel = () => {
+        if (!press) return;
+        press = null;
+        tile.draggable = true;
+        tile.classList.remove('opacity-50');
+        clearDropHints();
+      };
 
       tile.addEventListener('touchstart', event => {
         cancel();
         if (!touchTiles.matches || event.touches.length !== 1 || event.target.closest('button')) return;
         const touch = event.touches[0];
-        press = { id: touch.identifier, x: touch.clientX, y: touch.clientY, time: event.timeStamp, moved: false };
+        press = { id: touch.identifier, time: event.timeStamp };
+        tile.draggable = false;
       }, { passive: true });
       tile.addEventListener('touchmove', event => {
-        if (press && moved(event.touches[0], press)) press.moved = true;
-      }, { passive: true });
+        if (!press || event.touches.length !== 1 || event.timeStamp - press.time < 500) return;
+        event.preventDefault();
+        tile.classList.add('opacity-50');
+        const drop = touchDropTarget(event.touches[0], entry);
+        const className = drop?.tile ? `drop-${drop.action}` : null;
+        if (className && dropHint?.tile === drop.tile && dropHint.className === className) return;
+        clearDropHints();
+        if (className) {
+          drop.tile.classList.add(className);
+          dropHint = { tile: drop.tile, className };
+        }
+      }, { passive: false });
       tile.addEventListener('touchcancel', cancel);
-      tile.addEventListener('dragstart', cancel);
       tile.addEventListener('contextmenu', event => {
         if (touchTiles.matches && (press || event.pointerType === 'touch')) event.preventDefault();
       });
-      tile.addEventListener('touchend', event => {
+      tile.addEventListener('touchend', async event => {
         const start = press;
         cancel();
-        if (!start) return;
+        if (!start || event.touches.length || event.timeStamp - start.time < 500) return;
         const touch = Array.from(event.changedTouches).find(touch => touch.identifier === start.id);
-        if (!touch || start.moved || moved(touch, start) || event.timeStamp - start.time < 500) return;
+        if (!touch) return;
         event.preventDefault();
-        openTouchTileMenu(tile, data, isGroup);
+
+        const placement = entryPlacement(entry);
+        const drop = touchDropTarget(touch, entry);
+        if (drop?.target) await dropOnTile(entry, drop.target, drop.groupId, drop.action);
+        else if (drop) await moveEntry(entry, drop.groupId);
+
+        if (entryPlacement(entry) !== placement || touchTileMenu.open) return;
+        const currentTile = [...document.querySelectorAll('.app-tile')].find(node => node.dataset.entryId === entry.id);
+        if (currentTile) openTouchTileMenu(currentTile, data, isGroup);
       }, { passive: false });
     }
 
@@ -1088,16 +1185,9 @@ export default function App() {
         const source = { ...draggingEntry };
         const action = dropAction(event, tile, groupId);
         finishTileDrag();
-        if (sameEntry(source, entry)) return;
-        if (action === 'stack') await stackApp(source.id, entry);
-        else {
-          const entries = sortedEntries(entriesIn(groupId));
-          const index = entries.findIndex(item => sameEntry(item, entry));
-          const before = action === 'after' ? entries[index + 1] || null : entry;
-          await moveEntry(source, groupId, before);
-        }
+        await dropOnTile(source, entry, groupId, action);
       };
-      bindTouchTileMenu(tile, data, isGroup);
+      bindTouchTileMenu(tile, entry, data, isGroup);
       return tile;
     }
 
@@ -1824,32 +1914,10 @@ ${getGeneratedLucideRuntime()}
     document.getElementById('btn-fetch-github').onclick = async () => {
       // 新規取得の場合の処理
       const urlInput = document.getElementById('github-url-input');
-      let url = urlInput.value.trim();
+      const url = urlInput.value.trim();
       if (!url) {
         showAlert('GitHubのファイルURLを入力してください。');
         return;
-      }
-
-      // GitHubの通常URLをRaw URLに変換 (より堅牢なパース)
-      try {
-        const urlObj = new URL(url);
-
-        // GitHubのUIからコピーした際につきやすい不要なパラメータや行数指定(#)を削除
-        urlObj.search = '';
-        urlObj.hash = '';
-
-        if (urlObj.hostname === 'github.com') {
-          const parts = urlObj.pathname.split('/');
-          // parts構造: ["", "ユーザー名", "リポジトリ", "blob"(または"raw"), "ブランチ名", ...]
-          if (parts[3] === 'blob' || parts[3] === 'raw') {
-            parts.splice(3, 1); // "blob" または "raw" の部分を削除
-            urlObj.hostname = 'raw.githubusercontent.com';
-            urlObj.pathname = parts.join('/');
-          }
-        }
-        url = urlObj.toString();
-      } catch (e) {
-        // URLとして正しくない場合は無視（後のFetchでエラーハンドリングさせる）
       }
 
       const btn = document.getElementById('btn-fetch-github');
@@ -1860,22 +1928,9 @@ ${getGeneratedLucideRuntime()}
       unlinkGithubButton.disabled = true;
 
       try {
-        // キャッシュ回避のためにタイムスタンプを付与
-        let fetchUrl = url;
-        try {
-            const u = new URL(url);
-            u.searchParams.set('_t', Date.now());
-            fetchUrl = u.toString();
-        } catch(e) {}
-
-        const response = await fetch(fetchUrl, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
-        const text = await response.text();
+        const { text, isReact } = await fetchGithubSource(url);
         if (session !== editorSession || editorModal.classList.contains('hidden')) return;
-
-        // 拡張子からコードのタイプを推測
-        const originalUrl = urlInput.value.trim();
-        const isReact = url.match(/\.(jsx|tsx|js)$/i);
+        const originalUrl = url;
         currentGithubUrl = originalUrl;
         originalAppCodeType = isReact ? 'react' : 'html';
 
@@ -1908,7 +1963,7 @@ ${getGeneratedLucideRuntime()}
       } catch (err) {
         if (session !== editorSession || editorModal.classList.contains('hidden')) return;
         console.error(err);
-        showAlert('ファイルの取得に失敗しました。\nURLが正しいか、公開リポジトリであるか確認してください。\n\n詳細: ' + err.message);
+        showAlert('ファイルの取得に失敗しました。\nURLと、非公開リポジトリの場合はトークンの設定を確認してください。\n\n詳細: ' + err.message);
         btn.innerHTML = originalText;
       } finally {
         btn.disabled = false;
@@ -2212,7 +2267,60 @@ ${getGeneratedLucideRuntime()}
     };
 
     // --- 設定関連 ---
+    const githubTokenForm = document.getElementById('github-token-form');
+    const githubTokenStatus = document.getElementById('github-token-status');
+
+    function renderGithubTokens() {
+      const list = document.getElementById('github-token-list');
+      list.replaceChildren();
+      for (const repo of readGithubTokens().keys()) {
+        const item = document.createElement('li');
+        item.className = 'flex items-center justify-between gap-2';
+        const name = document.createElement('span');
+        name.textContent = repo;
+        const remove = document.createElement('button');
+        remove.className = 'rounded-lg border px-3 py-2 text-red-600';
+        remove.textContent = '削除';
+        remove.setAttribute('aria-label', `${repo} のトークンを削除`);
+        remove.onclick = () => {
+          const tokens = readGithubTokens();
+          tokens.delete(repo);
+          saveGithubTokens(tokens, 'トークンを削除しました。');
+        };
+        item.append(name, remove);
+        list.appendChild(item);
+      }
+    }
+
+    function saveGithubTokens(tokens, message) {
+      try {
+        localStorage.setItem(GITHUB_TOKENS_KEY, JSON.stringify([...tokens]));
+        renderGithubTokens();
+        githubTokenStatus.textContent = message;
+        return true;
+      } catch {
+        githubTokenStatus.textContent = 'トークンの設定を保存できませんでした。';
+        return false;
+      }
+    }
+
+    githubTokenForm.onsubmit = event => {
+      event.preventDefault();
+      const repo = document.getElementById('github-token-repo').value.trim().toLowerCase();
+      const token = document.getElementById('github-token-value').value.trim();
+      if (!/^[a-z0-9-]+\/[a-z0-9_.-]+$/.test(repo) || !/^[a-z0-9_]+$/i.test(token)) {
+        githubTokenStatus.textContent = '所有者/リポジトリ名とトークンを確認してください。';
+        return;
+      }
+      const tokens = readGithubTokens();
+      tokens.set(repo, token);
+      if (saveGithubTokens(tokens, 'トークンを登録しました。')) githubTokenForm.reset();
+    };
+
     function openSettings() {
+      githubTokenForm.reset();
+      githubTokenStatus.textContent = '';
+      renderGithubTokens();
       openModal(settingsModal);
       updateSettingsUI();
     }
@@ -2233,8 +2341,14 @@ ${getGeneratedLucideRuntime()}
 
     // イベントリスナー
     document.getElementById('btn-settings').onclick = openSettings;
-    document.getElementById('btn-close-settings').onclick = () => closeModal(settingsModal);
-    document.getElementById('btn-confirm-settings').onclick = () => closeModal(settingsModal);
+    document.getElementById('btn-close-settings').onclick = () => {
+      githubTokenForm.reset();
+      closeModal(settingsModal);
+    };
+    document.getElementById('btn-confirm-settings').onclick = () => {
+      githubTokenForm.reset();
+      closeModal(settingsModal);
+    };
 
     // 初期化ボタン
     document.getElementById('btn-reset-all').onclick = () => {
@@ -2257,6 +2371,7 @@ ${getGeneratedLucideRuntime()}
         localStorage.removeItem('webapp_hub_sort');
         localStorage.removeItem('webapp_hub_settings');
         localStorage.removeItem('webapp_hub_data');
+        localStorage.removeItem(GITHUB_TOKENS_KEY);
 
         // IndexedDBをクリア
         try {

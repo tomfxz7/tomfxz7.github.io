@@ -238,7 +238,7 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(self.ids(), ["a", "b", "c", "d"])
         self.assertEqual(self.state(), APPS)
 
-    def touch_hold(self, tile, move=False):
+    def touch_hold(self, tile, move=False, destination=None):
         tile.scroll_into_view_if_needed()
         box = tile.bounding_box()
         point = {"x": box["x"] + box["width"] / 2, "y": box["y"] + box["height"] / 2}
@@ -246,19 +246,25 @@ class LayoutTests(unittest.TestCase):
         session.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [point]})
         self.page.evaluate("() => new Promise(resolve => setTimeout(resolve, 550))")
         self.assertFalse(self.page.locator("#touch-tile-menu").is_visible())
-        if move:
+        if move or destination:
+            end = destination or {**point, "x": point["x"] + 30}
             session.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [
-                {**point, "x": point["x"] + 30}
+                end
             ]})
         session.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         session.detach()
 
-    def test_mobile_tile_menu_opens_only_after_stationary_hold(self):
+    def test_mobile_tile_menu_opens_only_when_placement_is_unchanged(self):
         self.seed()
         tile = self.tile("a")
         menu = self.page.locator("#touch-tile-menu")
         self.assertFalse(tile.locator(".btn-edit").is_visible())
         self.touch_hold(tile, move=True)
+        menu.wait_for()
+        menu.get_by_role("button", name="閉じる").tap()
+        box = self.tile("b").bounding_box()
+        self.touch_hold(tile, destination={"x": box["x"] + box["width"] * .9, "y": box["y"] + box["height"] * .5})
+        self.page.wait_for_function("layout.home[1].id === 'a'")
         self.assertFalse(menu.is_visible())
         self.touch_hold(tile)
         menu.get_by_role("button", name="削除", exact=True).tap()
@@ -321,6 +327,35 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(editor.input_value(), repaired)
         self.assertEqual(result.value.path().read_text(), repaired)
         repair.wait_for(state="hidden")
+
+    def test_private_github_token_registration_and_sync(self):
+        token = "test_read_only"
+        responses = iter(["<h1>Private</h1>", "<h1>Updated</h1>"])
+
+        def serve(route):
+            self.assertEqual(route.request.headers.get("authorization"), "Bearer " + token)
+            route.fulfill(content_type="text/html", body=next(responses))
+
+        self.page.route("https://api.github.com/repos/Example/Private/contents/app.html?ref=main", serve)
+        self.page.locator("#btn-settings").click()
+        self.page.locator("#github-token-repo").fill("Example/Private")
+        self.page.locator("#github-token-value").fill(token)
+        self.page.get_by_role("button", name="トークンを登録・更新").click()
+        self.page.get_by_role("button", name="example/private のトークンを削除").wait_for()
+        self.page.reload()
+
+        self.page.locator("#btn-add-app").click()
+        self.page.locator("#github-url-input").fill("https://github.com/Example/Private/blob/main/app.html")
+        self.page.locator("#btn-fetch-github").click()
+        self.page.locator("#btn-alert-ok").click()
+        self.page.locator("#btn-save-editor").click()
+        self.page.wait_for_selector("#editor-modal", state="hidden")
+        saved = self.state()["apps"][0]
+        self.assertEqual(saved["html"], "<h1>Private</h1>")
+        self.page.evaluate("id => syncGithubCode(id)", saved["id"])
+        self.page.locator("#btn-alert-ok").click()
+        self.assertEqual(self.state()["apps"][0]["html"], "<h1>Updated</h1>")
+        self.assertNotIn(token, json.dumps(self.export()))
 
     def test_unlink_github_enables_editing_and_persists_on_save(self):
         github_url = "https://github.com/example/project/blob/main/app.html"
