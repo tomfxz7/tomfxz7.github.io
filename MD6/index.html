@@ -54,7 +54,11 @@
     .app-tile.drop-stack { outline: 3px solid #6366f1; background: #eef2ff; }
     .tile-actions { opacity: 0; }
     .app-tile:hover .tile-actions, .app-tile:focus-within .tile-actions { opacity: 1; }
-    @media (hover: none) { .tile-actions { opacity: 1; } }
+    @media (hover: none) and (pointer: coarse) {
+      .tile-actions { visibility: hidden; }
+      .tile-actions:focus-within { visibility: visible; }
+      .app-tile { user-select: none; -webkit-touch-callout: none; }
+    }
   </style>
 </head>
 <body class="bg-slate-100/50 text-slate-800 font-sans selection:bg-indigo-100 min-h-screen flex flex-col overflow-hidden">
@@ -164,6 +168,18 @@
     </div>
   </div>
 
+  <dialog id="touch-tile-menu" aria-labelledby="touch-tile-title" class="w-72 max-w-[90vw] rounded-2xl p-4 shadow-xl backdrop:bg-slate-900/60">
+    <h3 id="touch-tile-title" class="mb-2 break-words font-bold"></h3>
+    <div class="flex flex-col gap-1">
+      <button type="button" data-tile-action="move" class="rounded-lg px-3 py-3 text-left hover:bg-slate-100">移動・グループ化</button>
+      <button type="button" data-tile-action="edit" class="rounded-lg px-3 py-3 text-left hover:bg-slate-100">編集</button>
+      <button type="button" data-tile-action="delete" class="rounded-lg px-3 py-3 text-left text-red-600 hover:bg-red-50">削除</button>
+      <form method="dialog">
+        <button class="w-full rounded-lg px-3 py-3 text-left hover:bg-slate-100">閉じる</button>
+      </form>
+    </div>
+  </dialog>
+
   <!-- タッチ・キーボードでも使える配置メニュー -->
   <div id="move-modal" role="dialog" aria-modal="true" aria-labelledby="move-title" class="fixed inset-0 bg-slate-900/60 z-[105] items-center justify-center p-4 hidden">
     <div class="bg-white p-6 rounded-3xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
@@ -245,9 +261,8 @@
                   <button type="button" id="btn-copy-html" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="表示中のコードをコピー">
                     <i data-lucide="copy" class="w-4 h-4"></i>
                   </button>
-                  <button type="button" id="btn-repair-html" class="flex items-center gap-1 p-1.5 text-xs text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
-                    <i data-lucide="wand-sparkles" class="w-4 h-4 shrink-0"></i>
-                    壊れたJSX変換HTMLファイルを修復
+                  <button type="button" id="btn-repair-html" class="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="壊れたJSX変換HTMLファイルを修復" aria-label="壊れたJSX変換HTMLファイルを修復">
+                    <i data-lucide="wand-sparkles" class="w-4 h-4"></i>
                   </button>
                   <button type="button" id="btn-clear-code" class="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="すべてクリア">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -277,9 +292,6 @@
 
             <button type="button" id="btn-unlink-github" class="hidden self-start mb-2 px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100">GitHub連携を解除して編集</button>
 
-            <div class="mb-2">
-              <input type="text" id="editor-history-comment" placeholder="履歴コメント（任意・履歴保存時のみ使用）" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/50" />
-            </div>
             <textarea id="editor-html" class="w-full flex-1 font-mono text-sm px-4 py-4 bg-slate-900 text-slate-100 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none leading-relaxed shadow-inner transition-colors" spellcheck="false"></textarea>
           </div>
         </div>
@@ -323,15 +335,21 @@
 
         <hr class="border-slate-100">
 
-        <!-- 情報 -->
+        <!-- リリース時の更新メモ（AI・開発者向け）
+             MD6 を修正して GitHub に反映するたびに、下の表示バージョンを上げ、
+             最終更新日（JST）も更新すること。 -->
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.9.4</span>
+            <span class="font-mono text-slate-800">1.9.5</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
             <span class="font-semibold text-indigo-600">tomfxz7</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-slate-500">最終更新日</span>
+            <time class="font-mono text-slate-800" datetime="2026-11-27">2026-11-27</time>
           </div>
         </div>
 
@@ -946,6 +964,59 @@ export default function App() {
       return x < 0.5 ? 'before' : 'after';
     }
 
+    const touchTileMenu = document.getElementById('touch-tile-menu');
+    const touchTileActions = touchTileMenu.querySelectorAll('[data-tile-action]');
+    const touchTiles = matchMedia('(hover: none) and (pointer: coarse)');
+
+    touchTileMenu.addEventListener('click', event => {
+      if (event.target === touchTileMenu) touchTileMenu.close();
+    });
+
+    function openTouchTileMenu(tile, data, isGroup) {
+      document.getElementById('touch-tile-title').textContent = data.name;
+      touchTileActions.forEach(button => {
+        const action = button.dataset.tileAction;
+        const original = tile.querySelector(`.btn-${action}`);
+        button.hidden = !original;
+        if (action === 'edit') button.textContent = isGroup ? 'グループ名を変更' : '編集';
+        button.onclick = () => {
+          touchTileMenu.close();
+          original?.click();
+        };
+      });
+      touchTileMenu.showModal();
+    }
+
+    function bindTouchTileMenu(tile, data, isGroup) {
+      let press = null;
+      const cancel = () => { press = null; };
+      const moved = (touch, start) => Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 10;
+
+      tile.addEventListener('touchstart', event => {
+        cancel();
+        if (!touchTiles.matches || event.touches.length !== 1 || event.target.closest('button')) return;
+        const touch = event.touches[0];
+        press = { id: touch.identifier, x: touch.clientX, y: touch.clientY, time: event.timeStamp, moved: false };
+      }, { passive: true });
+      tile.addEventListener('touchmove', event => {
+        if (press && moved(event.touches[0], press)) press.moved = true;
+      }, { passive: true });
+      tile.addEventListener('touchcancel', cancel);
+      tile.addEventListener('dragstart', cancel);
+      tile.addEventListener('contextmenu', event => {
+        if (touchTiles.matches && (press || event.pointerType === 'touch')) event.preventDefault();
+      });
+      tile.addEventListener('touchend', event => {
+        const start = press;
+        cancel();
+        if (!start) return;
+        const touch = Array.from(event.changedTouches).find(touch => touch.identifier === start.id);
+        if (!touch || start.moved || moved(touch, start) || event.timeStamp - start.time < 500) return;
+        event.preventDefault();
+        openTouchTileMenu(tile, data, isGroup);
+      }, { passive: false });
+    }
+
     function makeTile(entry, byId, groupId = null) {
       const data = byId.get(entry.id);
       const isGroup = entry.type === 'group';
@@ -1026,6 +1097,7 @@ export default function App() {
           await moveEntry(source, groupId, before);
         }
       };
+      bindTouchTileMenu(tile, data, isGroup);
       return tile;
     }
 

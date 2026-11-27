@@ -238,16 +238,56 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(self.ids(), ["a", "b", "c", "d"])
         self.assertEqual(self.state(), APPS)
 
+    def touch_hold(self, tile, move=False):
+        tile.scroll_into_view_if_needed()
+        box = tile.bounding_box()
+        point = {"x": box["x"] + box["width"] / 2, "y": box["y"] + box["height"] / 2}
+        session = self.context.new_cdp_session(self.page)
+        session.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [point]})
+        self.page.evaluate("() => new Promise(resolve => setTimeout(resolve, 550))")
+        self.assertFalse(self.page.locator("#touch-tile-menu").is_visible())
+        if move:
+            session.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [
+                {**point, "x": point["x"] + 30}
+            ]})
+        session.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        session.detach()
+
+    def test_mobile_tile_menu_opens_only_after_stationary_hold(self):
+        self.seed()
+        tile = self.tile("a")
+        menu = self.page.locator("#touch-tile-menu")
+        self.assertFalse(tile.locator(".btn-edit").is_visible())
+        self.touch_hold(tile, move=True)
+        self.assertFalse(menu.is_visible())
+        self.touch_hold(tile)
+        menu.get_by_role("button", name="削除", exact=True).tap()
+        self.page.locator("#confirm-modal").wait_for()
+        self.page.locator("#btn-confirm-cancel").tap()
+        self.assertIn("a", self.ids())
+
+    def test_desktop_tile_buttons_still_show_on_hover(self):
+        self.seed()
+        tile = self.tile("a")
+        actions = tile.locator(".tile-actions")
+        self.assertEqual(actions.evaluate("node => getComputedStyle(node).opacity"), "0")
+        tile.hover()
+        self.assertEqual(actions.evaluate("node => getComputedStyle(node).opacity"), "1")
+        self.assertEqual(actions.get_by_role("button").count(), 3)
+        self.assertFalse(self.page.locator("#touch-tile-menu").is_visible())
+
     def test_mobile_touch_grouping_and_moving_every_member_home(self):
         self.seed()
-        self.tile("a").locator(".btn-move").tap()
+        self.touch_hold(self.tile("a"))
+        self.page.locator('[data-tile-action="move"]').tap()
         self.page.locator("#move-stack-target").select_option("b")
         self.page.locator("#btn-move-stack").tap()
         self.page.wait_for_selector("#move-modal", state="hidden")
         group_id = self.state()["layout"]["groups"][0]["id"]
         self.tile(group_id).tap()
         for id in ["b", "a"]:
-            self.tile(id, "#group-grid").locator(".btn-move").tap()
+            self.touch_hold(self.tile(id, "#group-grid"))
+            self.page.locator('[data-tile-action="move"]').tap()
             self.page.locator("#move-destination").select_option("")
             self.page.locator("#move-position").select_option("")
             self.page.locator("#move-form button").tap()
@@ -353,7 +393,8 @@ class LayoutTests(unittest.TestCase):
             arg=app_id,
         )
         self.page.evaluate("switchTab('home')")
-        self.tile(app_id).locator(".btn-edit").tap()
+        self.touch_hold(self.tile(app_id))
+        self.page.locator('[data-tile-action="edit"]').tap()
         with self.page.expect_file_chooser() as update:
             self.page.get_by_role("button", name="HTMLファイルを選んで更新").tap()
         update.value.set_files(dict(name="replacement.htm", mimeType="text/html", buffer=updated_html.encode()))
