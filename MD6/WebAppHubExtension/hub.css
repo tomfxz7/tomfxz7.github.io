@@ -13,20 +13,25 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; }
-.top {
-  position: sticky; top: 0; z-index: 2;
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: .75rem;
-  min-height: 3.5rem; padding: .4rem clamp(.8rem, 3vw, 2.5rem);
-  background: #fff; border-bottom: 1px solid var(--border); box-shadow: 0 1px 2px #0f172a0b;
+/* 右端に操作分の幅を確保し、スクロール中もタイルに重ねない。 */
+.dial-home { padding-inline-end: 3.75rem; }
+.dial-home:has(.home-tabs:not([hidden])) { padding-inline-end: 8rem; }
+.home-controls {
+  position: fixed; inset-inline-end: .75rem; bottom: .75rem; z-index: 2;
+  display: flex; flex-direction: column; align-items: flex-end; gap: .5rem;
 }
-.brand { display: inline-flex; align-items: center; gap: .5rem; width: max-content; text-decoration: none; color: var(--indigo); font-size: 1.1rem; font-weight: 750; }
-.brand span { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .55rem; background: var(--indigo-light); font-size: 1.4rem; }
-.settings-button { grid-column: 3; justify-self: end; }
-.home-tabs { display: flex; gap: .25rem; padding: .25rem; border-radius: .8rem; background: #f1f5f9; }
+.home-controls .settings-button {
+  display: grid; place-items: center; width: 2.5rem; height: 2.5rem; padding: 0;
+  color: var(--indigo); font-size: 1.3rem; line-height: 1;
+  box-shadow: 0 1px 4px #0f172a16;
+}
+.home-tabs {
+  display: flex; flex-direction: column; gap: .25rem; padding: .25rem;
+  border: 1px solid var(--border); border-radius: .8rem; background: #f1f5f9;
+}
 .home-tabs button { white-space: nowrap; border-color: transparent; background: transparent; font-size: .875rem; color: var(--muted); }
 .home-tabs button[aria-pressed=true] { background: #fff; color: var(--indigo); box-shadow: 0 1px 4px #0f172a16; font-weight: 700; }
-main { max-width: 100rem; margin: auto; padding: clamp(1rem, 3.5vw, 3rem); }
-.heading { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-bottom: 1.25rem; }
+main { max-width: 100rem; margin: auto; padding: .85rem clamp(1rem, 3.5vw, 3rem); }
 h1, h2, h3 { line-height: 1.2; }
 h1 { margin: 0; font-size: clamp(1.25rem, 2.5vw, 1.65rem); }
 h2 { margin: 0; font-size: 1.25rem; }
@@ -67,7 +72,6 @@ h3 { margin: 1.5rem 0 .5rem; font-size: 1rem; }
 .tile-actions { position: absolute; top: .25rem; right: .3rem; display: flex; gap: .2rem; opacity: 0; }
 .tile:hover .tile-actions, .tile:focus-within .tile-actions { opacity: 1; }
 .tile-actions button { width: 1.65rem; height: 1.65rem; padding: 0; line-height: 1; color: #475569; border-radius: .45rem; box-shadow: 0 1px 2px #0f172a15; }
-.tile-actions button:disabled { opacity: .4; cursor: default; }
 .dragging { opacity: .5; }
 .drop-folder { outline: 2px solid #6366f1; background: #eef2ff; }
 .drop-before::before, .drop-after::after { content: ''; position: absolute; z-index: 1; top: 12%; bottom: 12%; width: 4px; border-radius: 4px; background: #6366f1; pointer-events: none; }
@@ -104,12 +108,11 @@ footer { display: flex; justify-content: end; gap: .5rem; margin-top: 1rem; flex
 .hint { color: var(--muted); font-size: .85rem; }
 [role=alert] { color: #b91c1c; }
 .player { height: 100vh; display: flex; flex-direction: column; }
-.player .top { display: flex; justify-content: space-between; padding: .4rem 1rem; gap: 1rem; }
 .player iframe { width: 100%; flex: 1; border: 0; background: #fff; }
 .player p { margin: .5rem 1rem; }
 @media (hover: none) { .tile-actions { opacity: 1; } }
 @media (max-width: 520px) {
-  .top { grid-template-columns: 1fr auto; }
-  .settings-button { grid-column: 2; grid-row: 1; }
-  .home-tabs { grid-column: 1 / -1; justify-self: center; }
+  .dial-home:has(.home-tabs:not([hidden])) { padding-inline-end: 6.5rem; }
+  .home-controls { inset-inline-end: .5rem; bottom: .5rem; }
+  .home-tabs button { padding-inline: .45rem; font-size: .8rem; }
 }

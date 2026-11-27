@@ -109,7 +109,9 @@ function bindDrag(tile, item) {
     const rect = tile.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width;
     const y = (event.clientY - rect.top) / rect.height;
-    if (item.children && !dragging.children && x > .25 && x < .75 && y > .2 && y < .8) return 'folder';
+    if (!activeFolder && !dragging.children && x > .25 && x < .75 && y > .2 && y < .8) {
+      return 'folder';
+    }
     return x < .5 ? 'before' : 'after';
   };
   tile.ondragover = event => {
@@ -132,25 +134,35 @@ function bindDrag(tile, item) {
     const action = position(event);
     dragging = null;
     clearDropHint();
-    if (action === 'folder') {
-      updateCollection(current => ({
-        ...current, entries: current.entries.map(entry => entry.id === source ? { ...entry, folderId: item.id } : entry),
-        order: [...current.order.filter(id => id !== source), source]
-      })).catch(showStateError);
-    } else {
-      reorder(source, item.id, action === 'after');
-    }
+    updateCollection(current => action === 'folder'
+      ? groupTiles(current, source, item.id)
+      : { ...current, order: movedOrder(current.order, source, item.id, action === 'after') }
+    ).catch(showStateError);
   };
 }
 
-function reorder(source, target, after) {
-  if (!target) return;
-  updateCollection(current => ({
-    ...current, order: movedOrder(current.order, source, target.id || target, after)
-  })).catch(showStateError);
+function groupTiles(current, source, target) {
+  const from = current.entries.find(entry => entry.id === source);
+  if (!from || from.folderId) return current;
+  if (current.folders.some(folder => folder.id === target)) {
+    return {
+      ...current,
+      entries: current.entries.map(entry => entry.id === source ? { ...entry, folderId: target } : entry),
+      order: [...current.order.filter(id => id !== source), source]
+    };
+  }
+  const to = current.entries.find(entry => entry.id === target);
+  if (!to || to.folderId) return current;
+  const folderId = crypto.randomUUID();
+  return {
+    ...current,
+    folders: [...current.folders, { id: folderId, name: '新しいフォルダー' }],
+    entries: current.entries.map(entry => entry.id === source || entry.id === target ? { ...entry, folderId } : entry),
+    order: current.order.filter(id => id !== source).flatMap(id => id === target ? [folderId, target, source] : [id])
+  };
 }
 
-function renderTile(item, index, items) {
+function renderTile(item) {
   const tile = element('article', '', 'tile');
   tile.dataset.id = item.id;
   tile.classList.toggle('site-tile', item.kind === 'site');
@@ -182,12 +194,7 @@ function renderTile(item, index, items) {
     launch.append(marker(item), caption);
   }
   const actions = element('div', '', 'tile-actions');
-  const previous = button('←', `${item.name} を前へ`, () => reorder(item.id, items[index - 1], false));
-  const next = button('→', `${item.name} を後ろへ`, () => reorder(item.id, items[index + 1], true));
-  previous.disabled = index === 0;
-  next.disabled = index === items.length - 1;
-  const edit = button('✎', `${item.name} を編集`, () => folder ? openFolderEditor(item) : openEditor(item));
-  actions.append(previous, next, edit);
+  actions.append(button('✎', `${item.name} を編集`, () => folder ? openFolderEditor(item) : openEditor(item)));
   tile.append(launch, actions);
   bindDrag(tile, item);
   return tile;
@@ -212,7 +219,7 @@ function render() {
   for (const tab of tabs) {
     tab.setAttribute('aria-pressed', String(tab.dataset.view === activeView));
   }
-  // DOM 順も左側のタブからに揃える。
+  // DOM 順も上側のボタンからに揃える。
   $('home-tabs').prepend(tabs.find(tab => tab.dataset.view === state.tabOrder) || tabs[0]);
   const { home, members } = visibleTiles();
   $('entries').replaceChildren(...home.map(renderTile), addTile);
@@ -280,10 +287,8 @@ function openEditor(entry) {
 }
 
 function openFolderEditor(folder) {
-  editingFolderId = folder?.id;
-  $('folder-title').textContent = folder ? 'フォルダーを編集' : 'フォルダーを作成';
-  $('folder-name').value = folder?.name || '';
-  $('remove-folder').hidden = !folder;
+  editingFolderId = folder.id;
+  $('folder-name').value = folder.name;
   $('folder-error').textContent = '';
   folderEditor.showModal();
 }
@@ -292,7 +297,6 @@ addTile.onclick = () => openEditor();
 addToFolder.onclick = () => openEditor();
 $('cancel-edit').onclick = () => editor.close();
 $('kind').onchange = syncFields;
-$('add-folder').onclick = () => openFolderEditor();
 $('cancel-folder').onclick = () => folderEditor.close();
 $('folder-form').onsubmit = async event => {
   event.preventDefault();
@@ -301,8 +305,7 @@ $('folder-form').onsubmit = async event => {
   if (!name) { $('folder-error').textContent = 'フォルダー名を入力してください。'; return; }
   try {
     await updateCollection(current => ({
-      ...current, folders: id ? current.folders.map(folder => folder.id === id ? { id, name } : folder)
-        : [...current.folders, { id: crypto.randomUUID(), name }]
+      ...current, folders: current.folders.map(folder => folder.id === id ? { id, name } : folder)
     }));
     folderEditor.close();
   } catch {

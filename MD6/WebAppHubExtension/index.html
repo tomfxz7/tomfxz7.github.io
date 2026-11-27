@@ -5,21 +5,15 @@
 <title>WebApp Hub</title>
 <link rel="stylesheet" href="hub.css">
 <script src="hub.js" type="module"></script>
-<body>
-  <header class="top">
-    <a href="index.html" class="brand"><span aria-hidden="true">▦</span> WebApp Hub</a>
+<body class="dial-home">
+  <div class="home-controls">
     <nav id="home-tabs" class="home-tabs" aria-label="表示するタイル" hidden>
       <button type="button" data-view="apps" aria-pressed="false">Web アプリ</button>
       <button type="button" data-view="sites" aria-pressed="false">Web サイト</button>
     </nav>
-    <button id="settings" class="settings-button"><span aria-hidden="true">⚙</span> 設定</button>
-  </header>
+    <button type="button" id="settings" class="settings-button" aria-label="設定" title="設定"><span aria-hidden="true">⚙︎</span></button>
+  </div>
   <main>
-    <div class="heading">
-      <h1>スピードダイヤル</h1>
-      <button id="add-folder">＋ フォルダー</button>
-    </div>
-    <p class="hint tile-help">タイルをドラッグして並び替えできます。フォルダーの中央に重ねると、そのフォルダーへ移動します。</p>
     <div id="entries" class="grid">
       <button id="add" aria-label="＋ 追加" class="add-tile"><span aria-hidden="true">＋</span> 追加</button>
     </div>
@@ -70,11 +64,11 @@
   </dialog>
   <dialog id="folder-editor">
     <form id="folder-form">
-      <h2 id="folder-title">フォルダーを作成</h2>
+      <h2>フォルダーを編集</h2>
       <label>フォルダー名<input id="folder-name" required maxlength="80"></label>
       <p id="folder-error" role="alert"></p>
       <footer>
-        <button type="button" id="remove-folder" class="danger" hidden>フォルダーを解除</button>
+        <button type="button" id="remove-folder" class="danger">フォルダーを解除</button>
         <button type="button" id="cancel-folder">キャンセル</button>
         <button class="primary">保存</button>
       </footer>
@@ -95,7 +89,7 @@
         <option value="sites">タブで分ける（Web サイトを最初に表示）</option>
       </select>
     </label>
-    <label id="tab-order-field">左側のタブ
+    <label id="tab-order-field">上側のボタン
       <select id="tab-order">
         <option value="apps">Web アプリ</option>
         <option value="sites">Web サイト</option>

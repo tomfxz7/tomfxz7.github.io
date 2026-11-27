@@ -15,10 +15,6 @@ async function start() {
   icon.rel = 'icon';
   icon.href = imageSource(entry.imageUrl) || 'favicon.ico';
   document.head.append(icon);
-  $('app-name').textContent = entry.name;
-  $('reload').hidden = false;
-  $('reload').onclick = () => location.reload();
-
   const prefix = `speed-dial:${entry.id}:`;
   const saved = () => Object.keys(localStorage)
     .filter(key => key.startsWith(prefix)).map(key => [key.slice(prefix.length), localStorage.getItem(key)]);
