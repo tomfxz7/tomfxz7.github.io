@@ -87,7 +87,7 @@ async function buildReact(source) {
 
 window.addEventListener('message', async event => {
   if (event.source !== parent || event.origin !== parentOrigin || event.data?.type !== 'hub-launch') return;
-  const { kind, source, fallback, storage } = event.data;
+  const { kind, source, fallback, storage, gestureKey } = event.data;
   try {
     let html = source;
     if (kind === 'react') {
@@ -98,7 +98,14 @@ window.addEventListener('message', async event => {
         html = fallback;
       }
     }
-    const shim = `<script>(${installStorage})(${scriptData(storage)}, ${scriptData(parentOrigin)});</script>`;
+    const gesture = `<script>(() => {
+      const send = parent.postMessage.bind(parent);
+      document.currentScript.remove();
+      (${installMouseGestures})(direction => send({
+        type: 'hub-gesture', direction, key: ${scriptData(gestureKey)}
+      }, ${scriptData(parentOrigin)}));
+    })();</script>`;
+    const shim = gesture + `<script>(${installStorage})(${scriptData(storage)}, ${scriptData(parentOrigin)});</script>`;
     const head = /^\s*(?:<!doctype[^>]*>\s*)?(?:<html\b[^>]*>\s*)?<head\b[^>]*>/i;
     const doctype = /^\s*<!doctype\b[^>]*>/i;
     const documentHtml = head.test(html) ? html.replace(head, tag => tag + shim)

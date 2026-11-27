@@ -1,4 +1,5 @@
 import { $, imageSource, isSpeedDial2Backup, movedOrder, parseBackup, readState, siteUrl, updateCollection } from './data.js';
+import { applyGesture } from './tab-actions.js';
 
 let state;
 let activeView;
@@ -213,9 +214,9 @@ function renderFolder(members) {
 }
 
 function render() {
-  const split = state.homeView !== 'all';
+  const split = activeView !== 'all';
   $('home-tabs').hidden = !split;
-  $('tab-order-field').hidden = !split;
+  $('tab-order-field').hidden = state.homeView === 'all';
   for (const tab of tabs) {
     tab.setAttribute('aria-pressed', String(tab.dataset.view === activeView));
   }
@@ -229,7 +230,8 @@ function render() {
 async function refresh() {
   const next = await readState();
   if (next.homeView !== state?.homeView) {
-    activeView = next.homeView;
+    const requested = !state && location.hash.slice(1);
+    activeView = ['apps', 'sites'].includes(requested) ? requested : next.homeView;
     if (folderPopup.open) folderPopup.close();
   }
   state = next;
@@ -241,12 +243,18 @@ async function refresh() {
   render();
 }
 
-for (const tab of tabs) {
-  tab.onclick = () => {
-    activeView = tab.dataset.view;
-    render();
-  };
+function showView(view) {
+  if (!state) return;
+  activeView = view;
+  if (folderPopup.open) folderPopup.close();
+  render();
 }
+
+for (const tab of tabs) tab.onclick = () => showView(tab.dataset.view);
+installMouseGestures(direction => {
+  applyGesture(direction, showView).catch(showStateError);
+}, () => !document.querySelector('dialog[open]'));
+
 $('close-folder-popup').onclick = () => folderPopup.close();
 folderPopup.addEventListener('click', event => {
   if (event.target === folderPopup) folderPopup.close();

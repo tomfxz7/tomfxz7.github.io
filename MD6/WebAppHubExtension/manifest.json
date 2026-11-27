@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WebApp Hub Speed Dial",
   "description": "新しいタブから Web サイトや HTML・JSX アプリを開くスピードダイヤル",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "permissions": ["storage", "unlimitedStorage"],
   "chrome_url_overrides": {"newtab": "index.html"},
   "sandbox": {"pages": ["sandbox.html"]},

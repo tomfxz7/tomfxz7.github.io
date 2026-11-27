@@ -1,4 +1,5 @@
 import { $, imageSource, readState } from './data.js';
+import { applyGesture } from './tab-actions.js';
 
 const id = new URLSearchParams(location.search).get('id');
 
@@ -15,6 +16,15 @@ async function start() {
   icon.rel = 'icon';
   icon.href = imageSource(entry.imageUrl) || 'favicon.ico';
   document.head.append(icon);
+  const runGesture = direction => applyGesture(direction, view => {
+    location.href = `index.html#${view}`;
+  }).catch(() => {
+    $('app-status').hidden = false;
+    $('app-status').textContent = 'タブを操作できませんでした。';
+  });
+  installMouseGestures(runGesture);
+  // アプリからのメッセージは、入力検出器にだけ渡した識別子で確認する。
+  const gestureKey = crypto.randomUUID();
   const prefix = `speed-dial:${entry.id}:`;
   const saved = () => Object.keys(localStorage)
     .filter(key => key.startsWith(prefix)).map(key => [key.slice(prefix.length), localStorage.getItem(key)]);
@@ -31,6 +41,8 @@ async function start() {
     } else if (message?.type === 'hub-error' && typeof message.text === 'string') {
       $('app-status').hidden = false;
       $('app-status').textContent = message.text;
+    } else if (message?.type === 'hub-gesture' && message.key === gestureKey) {
+      runGesture(message.direction);
     } else if (message?.type === 'hub-storage') {
       try {
         if (message.action === 'clear') saved().forEach(([key]) => localStorage.removeItem(prefix + key));
@@ -47,7 +59,7 @@ async function start() {
   });
 
   frame.addEventListener('load', () => frame.contentWindow.postMessage({
-    type: 'hub-launch', kind: entry.kind, source: entry.source, fallback: entry.fallback, storage: saved()
+    type: 'hub-launch', kind: entry.kind, source: entry.source, fallback: entry.fallback, storage: saved(), gestureKey
   }, '*'), { once: true });
   document.body.append(frame);
 }
