@@ -256,6 +256,41 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(self.ids(), ["c", "d", "b", "a"])
         self.assertEqual(self.state()["layout"]["groups"], [])
 
+    def test_mobile_html_file_add_and_update_preserve_app_storage(self):
+        first_html = """<!doctype html><html><head></head><body>
+<script>localStorage.setItem('draft', 'saved on mobile');</script>
+</body></html>"""
+        updated_html = """<!doctype html><html><head></head><body>
+<p id="draft"></p>
+<script>document.querySelector('#draft').textContent = localStorage.getItem('draft');</script>
+</body></html>""" + "<!--" + "x" * 250000 + "-->"
+
+        self.page.locator("#btn-add-app").tap()
+        with self.page.expect_file_chooser() as add:
+            self.page.get_by_role("button", name="HTMLファイルを選んで追加").tap()
+        add.value.set_files(dict(name="ノート.HTML", mimeType="text/html", buffer=first_html.encode()))
+        self.page.wait_for_selector("#editor-modal", state="hidden")
+        before = self.state()["apps"][0]
+        self.assertEqual(before["name"], "ノート")
+        app_id = before["id"]
+        self.tile(app_id).tap()
+        self.page.wait_for_function(
+            "id => localStorage.getItem('webapp_hub_scoped_' + id + '_draft') === 'saved on mobile'",
+            arg=app_id,
+        )
+        self.page.evaluate("switchTab('home')")
+        self.tile(app_id).locator(".btn-edit").tap()
+        with self.page.expect_file_chooser() as update:
+            self.page.get_by_role("button", name="HTMLファイルを選んで更新").tap()
+        update.value.set_files(dict(name="replacement.htm", mimeType="text/html", buffer=updated_html.encode()))
+        self.page.wait_for_selector("#editor-modal", state="hidden")
+        self.assertEqual(self.state()["apps"], [{**before, "sourceCode": updated_html, "html": updated_html}])
+
+        self.page.reload()
+        self.tile(app_id).tap()
+        frame = self.page.frame_locator(f"#iframe-{app_id}")
+        frame.get_by_text("saved on mobile", exact=True).wait_for(state="attached")
+
     def test_deleting_group_member_removes_empty_folder_but_keeps_other_apps(self):
         self.seed()
         self.drag("a", "b")

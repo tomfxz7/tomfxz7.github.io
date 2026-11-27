@@ -197,6 +197,10 @@
         <button id="btn-close-editor" class="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
       </div>
       <div class="p-6 flex-1 overflow-y-auto bg-slate-50 flex flex-col gap-6">
+        <div class="shrink-0">
+          <button type="button" id="btn-editor-html-file" class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 font-medium hover:bg-indigo-100 disabled:opacity-50">HTMLファイルを選んで追加</button>
+          <input type="file" id="editor-html-file" accept=".html,.htm,text/html" class="hidden" />
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[400px]">
           <!-- 左カラム: メタデータ -->
           <div class="flex flex-col gap-4">
@@ -659,6 +663,9 @@ export default function App() {
     const btnTypeReact = document.getElementById('btn-type-react');
     const nameInput = document.getElementById('editor-name');
     const htmlInput = document.getElementById('editor-html');
+    const htmlFileInput = document.getElementById('editor-html-file');
+    const htmlFileButton = document.getElementById('btn-editor-html-file');
+    let editorSession = 0;
     const urlInput = document.getElementById('editor-image-url');
     const previewArea = document.getElementById('editor-image-preview');
 
@@ -1484,6 +1491,8 @@ ${getGeneratedLucideRuntime()}
     btnTypeReact.onclick = () => { if (currentCodeType !== 'react') setCodeTypeUI('react'); };
 
     function openEditor(app = null) {
+      editorSession++;
+      htmlFileButton.textContent = app ? 'HTMLファイルを選んで更新' : 'HTMLファイルを選んで追加';
       currentEditingAppId = app?.id || null;
       forceEnableSaveAfterRestore = false;
       nameInput.value = app?.name || '';
@@ -1778,6 +1787,7 @@ ${getGeneratedLucideRuntime()}
 
 
     async function saveEditorApp(saveHistory = false, forceWithoutChanges = false, historyComment = '', forceHtmlSave = false) {
+      if (htmlFileButton.disabled) return;
       // 登録時の状態を更新する
       if (forceHtmlSave) {
           editorDraftHtml = htmlInput.value;
@@ -1816,6 +1826,7 @@ ${getGeneratedLucideRuntime()}
 
       saveBtn.disabled = true;
       saveBtnHistory.disabled = true;
+      htmlFileButton.disabled = true;
       saveText.textContent = "変換・保存中...";
       saveLoader.classList.remove('hidden');
 
@@ -1867,11 +1878,67 @@ ${getGeneratedLucideRuntime()}
         } finally {
             saveBtn.disabled = false;
             saveBtnHistory.disabled = false;
+            htmlFileButton.disabled = false;
             saveText.textContent = "保存して登録";
             saveLoader.classList.add('hidden');
         }
       }, 50);
     }
+
+    htmlFileButton.onclick = () => htmlFileInput.click();
+    htmlFileInput.onchange = async () => {
+      const file = htmlFileInput.files[0];
+      htmlFileInput.value = '';
+      if (!file || htmlFileButton.disabled) return;
+
+      if (!/\.html?$/i.test(file.name)) {
+        showAlert('HTMLファイル（.html または .htm）を選択してください。');
+        return;
+      }
+
+      const session = editorSession;
+      const appId = currentEditingAppId;
+      htmlFileButton.disabled = true;
+      try {
+        const html = await file.text();
+        if (session !== editorSession || editorModal.classList.contains('hidden')) return;
+        if (!html.trim()) {
+          showAlert('選択したHTMLファイルは空です。');
+          return;
+        }
+
+        const existing = appId ? apps.find(app => app.id === appId) : null;
+        if (appId && !existing) return;
+        if (existing?.githubUrl && !window.confirm('HTMLファイルで更新するとGitHub連携が解除されます。続けますか？')) return;
+
+        const app = existing ? { ...existing } : {
+          id: generateId(),
+          name: nameInput.value.trim() || file.name.replace(/\.html?$/i, '') || file.name,
+          imageUrl: currentImageUrl,
+          createdAt: Date.now(),
+          history: []
+        };
+        Object.assign(app, { codeType: 'html', sourceCode: html, html, githubUrl: '' });
+        apps = existing ? apps.map(item => item.id === appId ? app : item) : [...apps, app];
+
+        if (!await saveData()) {
+          apps = existing ? apps.map(item => item === app ? existing : item) : apps.filter(item => item !== app);
+          layout = normalizeLayout(layout, apps);
+          renderGrid();
+          return;
+        }
+
+        const iframe = document.getElementById(`iframe-${app.id}`);
+        if (iframe) iframe.srcdoc = injectStorageShim(app.id, app.html);
+        renderGrid();
+        if (session === editorSession) closeModal(editorModal);
+      } catch (error) {
+        console.error(error);
+        showAlert('HTMLファイルの読み込みに失敗しました。');
+      } finally {
+        htmlFileButton.disabled = false;
+      }
+    };
 
     document.getElementById('btn-save-editor').onclick = async () => saveEditorApp(false);
     document.getElementById('btn-save-editor-html').onclick = () => {
