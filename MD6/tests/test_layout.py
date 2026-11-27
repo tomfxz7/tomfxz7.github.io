@@ -355,7 +355,31 @@ class LayoutTests(unittest.TestCase):
         self.page.evaluate("id => syncGithubCode(id)", saved["id"])
         self.page.locator("#btn-alert-ok").click()
         self.assertEqual(self.state()["apps"][0]["html"], "<h1>Updated</h1>")
-        self.assertNotIn(token, json.dumps(self.export()))
+        backup = self.export()
+        self.assertEqual(backup["githubTokens"], [["example/private", token]])
+        self.page.evaluate("() => localStorage.removeItem(GITHUB_TOKENS_KEY)")
+        self.import_data(backup)
+        self.assertEqual(self.page.evaluate("() => [...readGithubTokens()]"), [["example/private", token]])
+
+        self.page.locator("#btn-settings").click()
+        manage = self.page.get_by_role("link", name="GitHub で作成済みのトークンを管理")
+        self.assertEqual(manage.get_attribute("href"), "https://github.com/settings/personal-access-tokens")
+        self.page.locator("#github-token-repo").fill("Example/Second")
+        self.page.locator("#github-token-value").fill("second_read_only")
+        self.page.get_by_role("button", name="トークンを登録・更新").click()
+        self.page.get_by_role("button", name="example/private のトークンを表示").click()
+        self.page.get_by_text(token, exact=True).wait_for()
+        self.page.get_by_role("button", name="example/private のトークンを隠す").click()
+        self.page.get_by_text(token, exact=True).wait_for(state="hidden")
+        self.page.get_by_role("button", name="example/private のトークンを編集").click()
+        self.assertEqual(self.page.locator("#github-token-value").input_value(), "")
+        self.assertFalse(self.page.locator("#github-token-repo").is_editable())
+        self.page.locator("#github-token-value").fill("replacement_read_only")
+        self.page.get_by_role("button", name="新しいトークンを保存").click()
+        self.page.reload()
+        self.assertEqual(self.page.evaluate("() => [...readGithubTokens()]"), [
+            ["example/private", "replacement_read_only"], ["example/second", "second_read_only"]
+        ])
 
     def test_unlink_github_enables_editing_and_persists_on_save(self):
         github_url = "https://github.com/example/project/blob/main/app.html"

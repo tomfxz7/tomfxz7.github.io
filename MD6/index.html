@@ -338,14 +338,16 @@
         <section aria-labelledby="github-token-title" class="flex flex-col gap-2 text-sm">
           <h3 id="github-token-title" class="font-semibold">非公開 GitHub リポジトリ</h3>
           <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">GitHub で読み取り専用トークンを作成</a>
+          <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">GitHub で作成済みのトークンを管理</a>
           <p>対象リポジトリを選び、Contents を Read-only にして有効期限を設定してください。登録後は各アプリにファイルの URL を貼るだけで取得・更新できます。</p>
-          <p>トークンはこのブラウザーに保存され、Hub 内のアプリや外部ライブラリのコードから読まれる可能性があります。信頼できるアプリだけを開き、外部ライブラリは動作確認済みの版を使ってください。トークンはバックアップに含まれません。</p>
+          <p>トークンはこのブラウザーに保存され、Hub 内のアプリや外部ライブラリのコードから読まれる可能性があります。信頼できるアプリだけを開き、外部ライブラリは動作確認済みの版を使ってください。バックアップに含めると、トークンは暗号化されずに保存されます。</p>
           <form id="github-token-form" class="flex flex-col gap-2">
             <label for="github-token-repo">リポジトリ（所有者/名前）</label>
             <input id="github-token-repo" required placeholder="owner/repository" autocapitalize="none" spellcheck="false" class="rounded-lg border px-3 py-2" />
             <label for="github-token-value">読み取り専用トークン</label>
             <input id="github-token-value" required type="password" autocomplete="off" class="rounded-lg border px-3 py-2" />
-            <button class="self-start rounded-lg bg-indigo-600 px-3 py-2 text-white">トークンを登録・更新</button>
+            <button id="github-token-submit" class="self-start rounded-lg bg-indigo-600 px-3 py-2 text-white">トークンを登録・更新</button>
+            <button id="github-token-cancel" type="button" hidden class="self-start rounded-lg border px-3 py-2">編集をキャンセル</button>
           </form>
           <p id="github-token-status" role="status"></p>
           <ul id="github-token-list" class="flex flex-col gap-2"></ul>
@@ -359,7 +361,7 @@
         <div class="bg-slate-50 p-4 rounded-2xl flex flex-col gap-1">
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">バージョン</span>
-            <span class="font-mono text-slate-800">1.9.6</span>
+            <span class="font-mono text-slate-800">1.9.8</span>
           </div>
           <div class="flex justify-between text-sm">
             <span class="text-slate-500">開発者</span>
@@ -418,9 +420,13 @@
         <span id="export-selected-count" class="text-xs text-slate-500">0件選択中</span>
       </div>
       <div id="export-app-list" class="max-h-72 overflow-y-auto border rounded-xl p-3 grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50"></div>
+      <div id="export-token-options" class="mt-3 text-sm">
+        <label><input type="checkbox" id="export-github-tokens"> 登録済み GitHub トークンをすべて含める</label>
+        <p>トークンは暗号化されません。トークンを含むファイルは共有しないでください。</p>
+      </div>
       <div class="flex gap-3 justify-end mt-4">
         <button id="btn-export-cancel" class="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg">キャンセル</button>
-        <button id="btn-export-confirm" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">選択したアプリをエクスポート</button>
+        <button id="btn-export-confirm" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">バックアップを保存</button>
       </div>
     </div>
   </div>
@@ -2270,14 +2276,41 @@ ${getGeneratedLucideRuntime()}
     const githubTokenForm = document.getElementById('github-token-form');
     const githubTokenStatus = document.getElementById('github-token-status');
 
+    const githubTokenRepo = document.getElementById('github-token-repo');
+    const githubTokenValue = document.getElementById('github-token-value');
+    const githubTokenSubmit = document.getElementById('github-token-submit');
+    const githubTokenCancel = document.getElementById('github-token-cancel');
+
+    function resetGithubTokenForm() {
+      githubTokenForm.reset();
+      githubTokenRepo.readOnly = false;
+      githubTokenSubmit.textContent = 'トークンを登録・更新';
+      githubTokenCancel.hidden = true;
+      document.querySelector('#github-token-list [aria-expanded="true"]')?.click();
+    }
+
+    githubTokenCancel.onclick = resetGithubTokenForm;
+
     function renderGithubTokens() {
       const list = document.getElementById('github-token-list');
       list.replaceChildren();
-      for (const repo of readGithubTokens().keys()) {
+      for (const [repo, token] of readGithubTokens()) {
         const item = document.createElement('li');
-        item.className = 'flex items-center justify-between gap-2';
         const name = document.createElement('span');
         name.textContent = repo;
+        const edit = document.createElement('button');
+        edit.className = 'rounded-lg border px-3 py-2';
+        edit.textContent = '編集';
+        edit.setAttribute('aria-label', `${repo} のトークンを編集`);
+        edit.onclick = () => {
+          resetGithubTokenForm();
+          githubTokenRepo.value = repo;
+          githubTokenRepo.readOnly = true;
+          githubTokenSubmit.textContent = '新しいトークンを保存';
+          githubTokenCancel.hidden = false;
+          githubTokenStatus.textContent = '';
+          githubTokenValue.focus();
+        };
         const remove = document.createElement('button');
         remove.className = 'rounded-lg border px-3 py-2 text-red-600';
         remove.textContent = '削除';
@@ -2285,9 +2318,32 @@ ${getGeneratedLucideRuntime()}
         remove.onclick = () => {
           const tokens = readGithubTokens();
           tokens.delete(repo);
-          saveGithubTokens(tokens, 'トークンを削除しました。');
+          if (saveGithubTokens(tokens, 'トークンを削除しました。') && githubTokenRepo.readOnly && githubTokenRepo.value === repo) resetGithubTokenForm();
         };
-        item.append(name, remove);
+        const value = document.createElement('code');
+        value.hidden = true;
+        value.className = 'break-all';
+        const reveal = document.createElement('button');
+        reveal.className = 'rounded-lg border px-3 py-2';
+        reveal.setAttribute('aria-expanded', 'false');
+        const setVisible = visible => {
+          reveal.textContent = visible ? '隠す' : '表示';
+          reveal.setAttribute('aria-label', `${repo} のトークンを${reveal.textContent}`);
+          reveal.setAttribute('aria-expanded', String(visible));
+          value.hidden = !visible;
+          value.textContent = visible ? token : '';
+        };
+        reveal.onclick = () => {
+          const visible = value.hidden;
+          if (visible) list.querySelector('[aria-expanded="true"]')?.click();
+          setVisible(visible);
+        };
+        setVisible(false);
+        const actions = document.createElement('div');
+        actions.className = 'flex flex-wrap gap-2';
+        actions.append(reveal, edit, remove);
+        item.className = 'flex flex-col gap-2';
+        item.append(name, actions, value);
         list.appendChild(item);
       }
     }
@@ -2304,21 +2360,26 @@ ${getGeneratedLucideRuntime()}
       }
     }
 
+    function validGithubToken(repo, token) {
+      return typeof repo === 'string' && typeof token === 'string' &&
+        /^[a-z0-9-]+\/[a-z0-9_.-]+$/.test(repo) && /^[a-z0-9_]+$/i.test(token);
+    }
+
     githubTokenForm.onsubmit = event => {
       event.preventDefault();
-      const repo = document.getElementById('github-token-repo').value.trim().toLowerCase();
-      const token = document.getElementById('github-token-value').value.trim();
-      if (!/^[a-z0-9-]+\/[a-z0-9_.-]+$/.test(repo) || !/^[a-z0-9_]+$/i.test(token)) {
+      const repo = githubTokenRepo.value.trim().toLowerCase();
+      const token = githubTokenValue.value.trim();
+      if (!validGithubToken(repo, token)) {
         githubTokenStatus.textContent = '所有者/リポジトリ名とトークンを確認してください。';
         return;
       }
       const tokens = readGithubTokens();
       tokens.set(repo, token);
-      if (saveGithubTokens(tokens, 'トークンを登録しました。')) githubTokenForm.reset();
+      if (saveGithubTokens(tokens, 'トークンを保存しました。')) resetGithubTokenForm();
     };
 
     function openSettings() {
-      githubTokenForm.reset();
+      resetGithubTokenForm();
       githubTokenStatus.textContent = '';
       renderGithubTokens();
       openModal(settingsModal);
@@ -2342,17 +2403,18 @@ ${getGeneratedLucideRuntime()}
     // イベントリスナー
     document.getElementById('btn-settings').onclick = openSettings;
     document.getElementById('btn-close-settings').onclick = () => {
-      githubTokenForm.reset();
+      resetGithubTokenForm();
       closeModal(settingsModal);
     };
     document.getElementById('btn-confirm-settings').onclick = () => {
-      githubTokenForm.reset();
+      resetGithubTokenForm();
       closeModal(settingsModal);
     };
 
     // 初期化ボタン
     document.getElementById('btn-reset-all').onclick = () => {
       // ダイアログを表示する前に設定画面を閉じる
+      resetGithubTokenForm();
       closeModal(settingsModal);
 
       document.getElementById('confirm-title').textContent = 'すべてのデータを初期化';
@@ -2505,6 +2567,9 @@ ${getGeneratedLucideRuntime()}
         list.appendChild(card);
       });
 
+      const hasTokens = readGithubTokens().size > 0;
+      document.getElementById('export-token-options').hidden = !hasTokens;
+      document.getElementById('export-github-tokens').checked = hasTokens;
       selectAll.checked = true;
       updateExportSelectedCount();
 
@@ -2512,7 +2577,7 @@ ${getGeneratedLucideRuntime()}
     }
 
     document.getElementById('btn-export').onclick = () => {
-      if (apps.length === 0) {
+      if (apps.length === 0 && !readGithubTokens().size) {
         showAlert('エクスポートできるアプリがありません。');
         return;
       }
@@ -2534,8 +2599,9 @@ ${getGeneratedLucideRuntime()}
     document.getElementById('btn-export-confirm').onclick = () => {
       const selectedIds = new Set(Array.from(document.querySelectorAll('.export-app-checkbox:checked'), cb => cb.value));
       const selectedApps = apps.filter(app => selectedIds.has(app.id));
-      if (selectedApps.length === 0) {
-        showAlert('エクスポートするアプリを1つ以上選択してください。');
+      const tokens = document.getElementById('export-github-tokens').checked ? [...readGithubTokens()] : [];
+      if (selectedApps.length === 0 && !tokens.length) {
+        showAlert('エクスポートするアプリか GitHub トークンを選択してください。');
         return;
       }
       // 選択したアプリだけを残し、ホーム順・グループ内順・ソート設定も含める。
@@ -2543,6 +2609,7 @@ ${getGeneratedLucideRuntime()}
         version: 2, apps: selectedApps.map(app => ({ ...app, html: getAppHtml(app) })), layout: normalizeLayout(layout, selectedApps),
         sortOption, settings: { tabDisplayMode }
       };
+      if (tokens.length) backup.githubTokens = tokens;
       const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -2559,8 +2626,13 @@ ${getGeneratedLucideRuntime()}
       reader.onload = (ev) => {
         try {
           const data = JSON.parse(ev.target.result);
-          importPendingData = readBackup(data);
-          document.getElementById('import-msg').textContent = `${importPendingData.apps.length} 件のアプリ、${importPendingData.layout.groups.length} 件のグループが見つかりました。上書きすると配置と並び順の設定も復元します。`;
+          const tokens = Array.isArray(data) ? [] : (data.githubTokens ?? []);
+          if (!Array.isArray(tokens) || tokens.some(pair => !Array.isArray(pair) || pair.length !== 2 || !validGithubToken(...pair))) {
+            throw new Error('トークンの形式が不正です。');
+          }
+          importPendingData = { ...readBackup(data), tokens };
+          document.getElementById('import-msg').textContent = `${importPendingData.apps.length} 件のアプリ、${importPendingData.layout.groups.length} 件のグループが見つかりました。上書きすると配置と並び順の設定も復元します。
+          ${tokens.length ? `GitHub トークン ${tokens.length} 件も復元します。同じリポジトリのトークンは置き換わります。` : ''}`;
           openModal(document.getElementById('import-modal'));
         } catch(e) { importPendingData = null; showAlert('不正なファイルです。JSON形式とデータの内容を確認してください。'); }
       };
@@ -2568,8 +2640,20 @@ ${getGeneratedLucideRuntime()}
       e.target.value = ''; // 連続で同じファイルをインポートできるようにリセット
     };
 
+    function restoreGithubTokens(tokens) {
+      if (!tokens.length) return true;
+      try {
+        const merged = new Map([...readGithubTokens(), ...tokens]);
+        localStorage.setItem(GITHUB_TOKENS_KEY, JSON.stringify([...merged]));
+        return true;
+      } catch {
+        showAlert('GitHub トークンを復元できませんでした。');
+        return false;
+      }
+    }
+
     document.getElementById('btn-import-append').onclick = async () => {
-      if (!importPendingData) return;
+      if (!importPendingData || !restoreGithubTokens(importPendingData.tokens)) return;
       const imported = importPendingData;
       useVisibleOrder();
       // 同じバックアップを繰り返し追加しても、タブや所属を混同しない。
@@ -2588,7 +2672,7 @@ ${getGeneratedLucideRuntime()}
       closeModal(document.getElementById('import-modal'));
     };
     document.getElementById('btn-import-overwrite').onclick = async () => {
-      if (!importPendingData) return;
+      if (!importPendingData || !restoreGithubTokens(importPendingData.tokens)) return;
       [...openAppIds].forEach(id => closeTab(id));
       closeGroup();
       apps = importPendingData.apps;
