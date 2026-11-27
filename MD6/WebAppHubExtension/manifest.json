@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "WebApp Hub Speed Dial",
+  "description": "新しいタブから Web サイトや HTML・JSX アプリを開くスピードダイヤル",
+  "version": "1.1.0",
+  "permissions": ["storage", "unlimitedStorage"],
+  "chrome_url_overrides": {"newtab": "index.html"},
+  "sandbox": {"pages": ["sandbox.html"]},
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none';",
+    "sandbox": "sandbox allow-scripts allow-forms allow-modals allow-downloads allow-popups allow-popups-to-escape-sandbox; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: blob: data:; object-src 'none';"
+  },
+  "web_accessible_resources": [{
+    "resources": ["vendor/react.js", "vendor/react-dom.js", "vendor/iframe-lucide.js"],
+    "matches": ["<all_urls>"]
+  }]
+}
