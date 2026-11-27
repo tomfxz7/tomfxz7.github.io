@@ -256,6 +256,80 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(self.ids(), ["c", "d", "b", "a"])
         self.assertEqual(self.state()["layout"]["groups"], [])
 
+    def test_html_save_context_menu_repairs_and_downloads(self):
+        self.page.locator("#btn-add-app").click()
+        source = '<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>'
+        editor = self.page.locator("#editor-html")
+        editor.fill(source)
+        save = self.page.get_by_role("button", name="HTMLで保存", exact=True)
+        repair = self.page.get_by_role("menuitem", name="壊れたJSX変換HTMLファイルを修復して保存")
+
+        save.press("Shift+F10")
+        repair.wait_for()
+        repair.press("Escape")
+        repair.wait_for(state="hidden")
+
+        with self.page.expect_download():
+            save.click()
+        self.assertEqual(editor.input_value(), source)
+        self.page.locator("#btn-alert-ok").click()
+
+        save.click(button="right")
+        with self.page.expect_download() as result:
+            repair.click()
+        repaired = source.replace("react@18/", "react@18.3.1/")
+        self.assertEqual(editor.input_value(), repaired)
+        self.assertEqual(result.value.path().read_text(), repaired)
+        repair.wait_for(state="hidden")
+
+    def test_unlink_github_enables_editing_and_persists_on_save(self):
+        github_url = "https://github.com/example/project/blob/main/app.html"
+        self.seed([{**APPS[0], "githubUrl": github_url}])
+        self.tile("a").locator(".btn-edit").click()
+        editor = self.page.locator("#editor-html")
+        unlink = self.page.get_by_role("button", name="GitHub連携を解除して編集")
+        self.assertFalse(editor.is_editable())
+        unlink.click()
+        self.assertTrue(editor.is_editable())
+        self.assertEqual(self.page.locator("#github-url-input").input_value(), "")
+        self.assertEqual(editor.input_value(), APPS[0]["html"])
+        self.page.locator("#btn-cancel-editor").click()
+        self.assertEqual(self.state()[0]["githubUrl"], github_url)
+
+        self.tile("a").locator(".btn-edit").click()
+        unlink.click()
+        editor.fill("<h1>Updated locally</h1>")
+        self.page.locator("#btn-save-editor").click()
+        self.page.wait_for_selector("#editor-modal", state="hidden")
+        self.page.reload()
+        self.tile("a").locator(".btn-edit").click()
+        self.assertTrue(editor.is_editable())
+        self.assertEqual(editor.input_value(), "<h1>Updated locally</h1>")
+        unlink.wait_for(state="hidden")
+
+    def test_stored_react_app_restores_preview_and_backup_html(self):
+        source = "export default function App() { return <h1>React example</h1>; }"
+        self.seed([{**APPS[0], "codeType": "react", "sourceCode": source, "html": "<p>Old output</p>"}])
+
+        self.tile("a").locator(".btn-edit").click()
+        editor = self.page.locator("#editor-html")
+        self.assertEqual(editor.input_value(), source)
+        self.page.locator("#btn-type-html").click()
+        generated = editor.input_value()
+        self.assertIn("<h1>React example</h1>", generated)
+        self.assertIn('type="text/babel" data-presets="env,react"', generated)
+        self.assertNotIn("Old output", generated)
+        self.assertFalse(editor.is_editable())
+        self.page.locator("#btn-cancel-editor").click()
+
+        exported = self.export()
+        self.assertEqual(exported["apps"][0]["html"], generated)
+        self.assertEqual(exported["apps"][0]["sourceCode"], source)
+        self.import_data(exported)
+        self.tile("a").locator(".btn-edit").click()
+        self.page.locator("#btn-type-html").click()
+        self.assertEqual(editor.input_value(), generated)
+
     def test_mobile_html_file_add_and_update_preserve_app_storage(self):
         first_html = """<!doctype html><html><head></head><body>
 <script>localStorage.setItem('draft', 'saved on mobile');</script>

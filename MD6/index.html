@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json">
 
   <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./hub.css">
 
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -238,15 +238,16 @@
 
           <!-- 右カラム: コードエディタ -->
           <div class="flex-1 flex flex-col h-full min-h-[300px]">
-            <div class="flex justify-between items-end mb-2">
+            <div class="flex flex-wrap justify-between items-end gap-2 mb-2">
               <label class="block text-sm font-semibold text-slate-700">ソースコード</label>
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <div class="flex items-center gap-1">
                   <button type="button" id="btn-copy-html" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="表示中のコードをコピー">
                     <i data-lucide="copy" class="w-4 h-4"></i>
                   </button>
-                  <button type="button" id="btn-repair-html" class="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="変換済みHTMLを修復">
-                    <i data-lucide="wand-sparkles" class="w-4 h-4"></i>
+                  <button type="button" id="btn-repair-html" class="flex items-center gap-1 p-1.5 text-xs text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">
+                    <i data-lucide="wand-sparkles" class="w-4 h-4 shrink-0"></i>
+                    壊れたJSX変換HTMLファイルを修復
                   </button>
                   <button type="button" id="btn-clear-code" class="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="すべてクリア">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -274,6 +275,8 @@
               </button>
             </div>
 
+            <button type="button" id="btn-unlink-github" class="hidden self-start mb-2 px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100">GitHub連携を解除して編集</button>
+
             <div class="mb-2">
               <input type="text" id="editor-history-comment" placeholder="履歴コメント（任意・履歴保存時のみ使用）" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/50" />
             </div>
@@ -281,10 +284,14 @@
           </div>
         </div>
       </div>
-      <div class="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
+      <div class="px-6 py-4 border-t border-slate-100 bg-white relative flex flex-wrap justify-end gap-3 shrink-0">
         <button id="btn-cancel-editor" class="px-6 py-2.5 text-slate-600 hover:bg-slate-100 border rounded-xl font-medium transition-colors">キャンセル</button>
-        <button id="btn-repair-save-html" class="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors">修復してHTML保存</button>
-        <button id="btn-save-editor-html" class="px-4 py-2.5 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 transition-colors">HTMLで保存</button>
+        <div id="editor-html-save-actions" class="sm:relative">
+          <button type="button" id="btn-save-editor-html" aria-haspopup="menu" aria-expanded="false" aria-controls="editor-html-save-menu" title="右クリックで修復メニューを表示" class="px-4 py-2.5 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 transition-colors">HTMLで保存</button>
+          <div id="editor-html-save-menu" role="menu" aria-label="HTMLの保存オプション" class="hidden absolute bottom-full right-4 sm:right-0 z-10 mb-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+            <button type="button" id="btn-repair-save-html" role="menuitem" class="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 focus:bg-emerald-50">壊れたJSX変換HTMLファイルを修復して保存</button>
+          </div>
+        </div>
         <button id="btn-save-editor-with-history" class="px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition-colors">履歴を残して保存</button>
         <button id="btn-save-editor" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors flex items-center gap-2">
           <span id="save-editor-text">保存して登録</span>
@@ -422,11 +429,8 @@
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const tabFromHash = hashParams.get('tab') || 'home';
 
-      if (tabFromHash === 'home' || apps.find(a => a.id === tabFromHash)) {
-          switchTab(tabFromHash, true);
-      } else {
-          switchTab('home', true);
-      }
+      const nextTab = apps.some(app => app.id === tabFromHash) ? tabFromHash : 'home';
+      if (nextTab !== activeTabId) switchTab(nextTab, true);
     });
 
     // --- IndexedDB ラッパー (大容量保存用) ---
@@ -479,6 +483,7 @@
     let sortOption = 'date-asc';
     let draggingEntry = null;
     let isInternalAppDrag = false;
+    let dropHint = null;
     let layout = { home: [], groups: [] };
     let activeGroupId = null;
     let movingEntry = null;
@@ -563,7 +568,7 @@
             await saveData();
 
             const iframe = document.getElementById(`iframe-${app.id}`);
-            if (iframe) iframe.srcdoc = injectStorageShim(app.id, normalizeGeneratedReactHtml(runnableHtml));
+            if (iframe) iframe.srcdoc = injectStorageShim(app.id, updatedApp.html);
 
             renderGrid();
             showAlert('GitHubから最新のコードに同期しました！');
@@ -714,14 +719,24 @@ export default function App() {
     const entryData = entry => entry.type === 'group' ? findGroup(entry.id) : apps.find(app => app.id === entry.id);
     const entriesIn = groupId => groupId ? (findGroup(groupId)?.appIds || []).map(appEntry) : layout.home;
 
-    function sortedEntries(entries, option = sortOption, lookup = entryData) {
-      return [...entries].sort((a, b) => {
-        const left = lookup(a), right = lookup(b);
-        if (option === 'name-asc') return left.name.localeCompare(right.name, 'ja');
-        if (option === 'name-desc') return right.name.localeCompare(left.name, 'ja');
-        if (option === 'date-asc') return (left.createdAt || 0) - (right.createdAt || 0);
-        if (option === 'date-desc') return (right.createdAt || 0) - (left.createdAt || 0);
-        return 0;
+    function indexEntries(appList = apps, groups = layout.groups) {
+      const byId = new Map();
+      appList.forEach(app => byId.set(app.id, app));
+      groups.forEach(group => byId.set(group.id, group));
+      return byId;
+    }
+
+    function sortedEntries(entries, option = sortOption, byId) {
+      const sorted = [...entries];
+      if (option === 'custom' || sorted.length < 2) return sorted;
+
+      byId ??= indexEntries();
+      const descending = option.endsWith('-desc');
+      const byName = option.startsWith('name-');
+      return sorted.sort((a, b) => {
+        const left = byId.get(a.id), right = byId.get(b.id);
+        const order = byName ? left.name.localeCompare(right.name, 'ja') : (left.createdAt || 0) - (right.createdAt || 0);
+        return descending ? -order : order;
       });
     }
 
@@ -751,7 +766,10 @@ export default function App() {
       return { home, groups };
     }
 
-    function readBackup(data) {
+    // 保存済み React アプリの変換は、HTML が必要になった時に行う。
+    const deferredReactHtml = new WeakMap();
+
+    function readBackup(data, { deferReactHtml = false } = {}) {
       const legacy = Array.isArray(data);
       if (!legacy && (!data || data.version !== 2 || !Array.isArray(data.apps))) throw new Error('未対応のバックアップ形式です。');
       const rawApps = legacy ? data : data.apps;
@@ -766,12 +784,16 @@ export default function App() {
           id = generateId();
         }
         ids.add(id);
-        return {
+        const parsed = {
           ...app, id, codeType: app.codeType === 'react' ? 'react' : 'html',
           sourceCode: app.sourceCode !== undefined ? app.sourceCode : app.html,
-          html: app.codeType === 'react' ? buildReactHtmlForStoredApp(app) : app.html,
           history: Array.isArray(app.history) ? app.history : [], githubUrl: app.githubUrl || ''
         };
+        if (parsed.codeType === 'react') {
+          if (deferReactHtml) deferredReactHtml.set(parsed, null);
+          else parsed.html = buildReactHtmlForStoredApp(app);
+        }
+        return parsed;
       });
       if (!legacy) {
         const value = data.layout;
@@ -793,8 +815,10 @@ export default function App() {
 
     // 自動ソートから動かした時は、画面上の順序を手動配置の出発点にする。
     function useVisibleOrder() {
-      layout.home = sortedEntries(layout.home);
-      layout.groups.forEach(group => { group.appIds = sortedEntries(group.appIds.map(appEntry)).map(entry => entry.id); });
+      if (sortOption === 'custom') return;
+      const byId = indexEntries();
+      layout.home = sortedEntries(layout.home, sortOption, byId);
+      layout.groups.forEach(group => { group.appIds = sortedEntries(group.appIds.map(appEntry), sortOption, byId).map(entry => entry.id); });
       sortOption = 'custom';
       sortSelect.value = sortOption;
     }
@@ -837,9 +861,9 @@ export default function App() {
     }
 
     async function persistLayout() {
-      layout = normalizeLayout(layout, apps);
+      const saved = saveData();
       renderGrid();
-      await saveData();
+      await saved;
     }
 
     async function init() {
@@ -849,7 +873,7 @@ export default function App() {
       }
       if (savedData) {
         try {
-          const state = readBackup(savedData);
+          const state = readBackup(savedData, { deferReactHtml: true });
           apps = state.apps;
           layout = state.layout;
           sortOption = state.sortOption;
@@ -874,7 +898,11 @@ export default function App() {
 
     async function saveData() {
       layout = normalizeLayout(layout, apps);
-      const snapshot = structuredClone({ version: 2, apps, layout, sortOption, settings: { tabDisplayMode } });
+      // アプリ本体は置き換え、可変の配置だけを複製する。HTMLの複製は IndexedDB に任せる。
+      const snapshot = {
+        version: 2, apps: [...apps], layout: structuredClone(layout),
+        sortOption, settings: { tabDisplayMode }
+      };
       // 同時保存も呼び出し順に完了させ、古い状態の書き戻しを防ぐ。
       const pending = saveQueue.then(() => idbSet('webapp_hub_data', snapshot));
       saveQueue = pending.catch(() => {});
@@ -899,7 +927,9 @@ export default function App() {
     }
 
     function clearDropHints() {
-      document.querySelectorAll('.drop-before, .drop-after, .drop-stack').forEach(tile => tile.classList.remove('drop-before', 'drop-after', 'drop-stack'));
+      if (!dropHint) return;
+      dropHint.tile.classList.remove(dropHint.className);
+      dropHint = null;
     }
 
     function finishTileDrag() {
@@ -908,7 +938,7 @@ export default function App() {
       clearDropHints();
     }
 
-    function dropAction(event, tile, target, groupId) {
+    function dropAction(event, tile, groupId) {
       const rect = tile.getBoundingClientRect();
       const x = (event.clientX - rect.left) / rect.width;
       const y = (event.clientY - rect.top) / rect.height;
@@ -916,8 +946,8 @@ export default function App() {
       return x < 0.5 ? 'before' : 'after';
     }
 
-    function makeTile(entry, groupId = null) {
-      const data = entryData(entry);
+    function makeTile(entry, byId, groupId = null) {
+      const data = byId.get(entry.id);
       const isGroup = entry.type === 'group';
       const tile = document.createElement('div');
       tile.className = 'app-tile aspect-square relative group rounded-3xl bg-white shadow-sm hover:shadow-xl border border-slate-100 transition-shadow cursor-pointer flex flex-col items-center justify-center p-4';
@@ -929,7 +959,7 @@ export default function App() {
       tile.dataset.entryType = entry.type;
       if (!isGroup) tile.dataset.appId = entry.id;
       const icon = isGroup
-        ? `<div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-indigo-50 border border-indigo-100 grid grid-cols-2 grid-rows-2 gap-1 p-2 overflow-hidden">${data.appIds.slice(0, 4).map(id => appIcon(apps.find(app => app.id === id), true)).join('')}</div>`
+        ? `<div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-indigo-50 border border-indigo-100 grid grid-cols-2 grid-rows-2 gap-1 p-2 overflow-hidden">${data.appIds.slice(0, 4).map(id => appIcon(byId.get(id), true)).join('')}</div>`
         : appIcon(data);
       tile.innerHTML = `
         <div class="tile-actions absolute top-1 right-1 flex gap-1 z-10">
@@ -967,17 +997,25 @@ export default function App() {
       tile.ondragover = event => {
         if (!draggingEntry) return;
         event.preventDefault(); event.stopPropagation();
-        clearDropHints();
-        if (sameEntry(draggingEntry, entry)) return;
+        if (sameEntry(draggingEntry, entry)) {
+          clearDropHints();
+          return;
+        }
         event.dataTransfer.dropEffect = 'move';
-        tile.classList.add(`drop-${dropAction(event, tile, entry, groupId)}`);
+        const className = `drop-${dropAction(event, tile, groupId)}`;
+        if (dropHint?.tile === tile && dropHint.className === className) return;
+        clearDropHints();
+        tile.classList.add(className);
+        dropHint = { tile, className };
       };
-      tile.ondragleave = event => { if (!tile.contains(event.relatedTarget)) clearDropHints(); };
+      tile.ondragleave = event => {
+        if (dropHint?.tile === tile && !tile.contains(event.relatedTarget)) clearDropHints();
+      };
       tile.ondrop = async event => {
         if (!draggingEntry) return;
         event.preventDefault(); event.stopPropagation();
         const source = { ...draggingEntry };
-        const action = dropAction(event, tile, entry, groupId);
+        const action = dropAction(event, tile, groupId);
         finishTileDrag();
         if (sameEntry(source, entry)) return;
         if (action === 'stack') await stackApp(source.id, entry);
@@ -992,17 +1030,18 @@ export default function App() {
     }
 
     function renderGrid() {
-      layout = normalizeLayout(layout, apps);
-      gridContainer.innerHTML = '';
+      const byId = indexEntries();
+      const fragment = document.createDocumentFragment();
       const addButton = document.createElement('button');
       addButton.id = 'btn-add-app';
       addButton.className = 'aspect-square flex flex-col items-center justify-center gap-4 rounded-3xl bg-white border-2 border-dashed border-slate-200 text-slate-500 hover:border-indigo-400 hover:text-indigo-600';
       addButton.onclick = () => openEditor();
       addButton.innerHTML = '<i data-lucide="plus" class="w-8 h-8"></i><span class="font-bold text-xs">アプリを追加</span>';
-      gridContainer.appendChild(addButton);
-      sortedEntries(layout.home).forEach(entry => gridContainer.appendChild(makeTile(entry)));
+      fragment.appendChild(addButton);
+      sortedEntries(layout.home, sortOption, byId).forEach(entry => fragment.appendChild(makeTile(entry, byId)));
+      gridContainer.replaceChildren(fragment);
       lucide.createIcons({ root: gridContainer });
-      if (activeGroupId && findGroup(activeGroupId)) renderGroup();
+      if (activeGroupId && byId.has(activeGroupId)) renderGroup(byId);
       else closeGroup();
     }
 
@@ -1019,13 +1058,13 @@ export default function App() {
       closeModal(document.getElementById('group-modal'));
     }
 
-    function renderGroup() {
-      const group = findGroup(activeGroupId);
+    function renderGroup(byId = indexEntries()) {
+      const group = byId.get(activeGroupId);
       document.getElementById('group-name').value = group.name;
       document.getElementById('group-count').textContent = `${group.appIds.length}個のアプリ`;
       const grid = document.getElementById('group-grid');
-      grid.innerHTML = '';
-      sortedEntries(entriesIn(group.id)).forEach(entry => grid.appendChild(makeTile(entry, group.id)));
+      const tiles = sortedEntries(group.appIds.map(appEntry), sortOption, byId);
+      grid.replaceChildren(...tiles.map(entry => makeTile(entry, byId, group.id)));
       lucide.createIcons({ root: document.getElementById('group-modal') });
     }
 
@@ -1181,7 +1220,7 @@ export default function App() {
             iframe.id = `iframe-${id}`;
             iframe.className = "absolute inset-0 w-full h-full border-none hidden bg-white";
             iframe.sandbox = "allow-scripts allow-forms allow-modals allow-downloads allow-same-origin allow-popups allow-popups-to-escape-sandbox";
-            iframe.srcdoc = injectStorageShim(id, app.html);
+            iframe.srcdoc = injectStorageShim(id, getAppHtml(app));
             iframeManager.appendChild(iframe);
         }
       }
@@ -1220,7 +1259,7 @@ export default function App() {
       const iframe = document.getElementById(`iframe-${activeTabId}`);
       if (app && iframe) {
         iframe.srcdoc = '';
-        setTimeout(() => { iframe.srcdoc = injectStorageShim(app.id, app.html); }, 50);
+        setTimeout(() => { iframe.srcdoc = injectStorageShim(app.id, getAppHtml(app)); }, 50);
       }
     }
 
@@ -1441,6 +1480,15 @@ ${getGeneratedLucideRuntime()}
         }
     }
 
+    function getAppHtml(app) {
+      const cached = deferredReactHtml.get(app);
+      if (cached === undefined) return app.html;
+      if (cached !== null) return cached;
+      const html = buildReactHtmlForStoredApp(app);
+      deferredReactHtml.set(app, html);
+      return html;
+    }
+
     // --- エディタ関連ロジック ---
     function setCodeTypeUI(type) {
         // 現在の入力を下書きに保存する
@@ -1497,12 +1545,9 @@ ${getGeneratedLucideRuntime()}
       forceEnableSaveAfterRestore = false;
       nameInput.value = app?.name || '';
 
-      const ghInput = document.getElementById('github-url-input');
-      const ghBtn = document.getElementById('btn-fetch-github');
-
       if (app) {
           originalAppCodeType = app.codeType || 'html';
-          editorDraftHtml = app.html || '';
+          editorDraftHtml = getAppHtml(app) || '';
           editorDraftReact = app.sourceCode || '';
           currentGithubUrl = app.githubUrl || '';
 
@@ -1518,17 +1563,8 @@ ${getGeneratedLucideRuntime()}
           setCodeTypeUI('html');
       }
 
-      if (currentGithubUrl) {
-          ghInput.value = currentGithubUrl;
-          ghInput.readOnly = true;
-          ghInput.classList.add('bg-slate-100', 'text-slate-500');
-          ghBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新';
-      } else {
-          ghInput.value = '';
-          ghInput.readOnly = false;
-          ghInput.classList.remove('bg-slate-100', 'text-slate-500');
-          ghBtn.innerHTML = '<i data-lucide="download-cloud" class="w-4 h-4"></i>取得';
-      }
+      updateGithubEditorUI();
+      closeHtmlSaveMenu();
 
       currentImageUrl = app?.imageUrl || '';
       urlInput.value = currentImageUrl;
@@ -1558,17 +1594,17 @@ ${getGeneratedLucideRuntime()}
       const imageUrl = document.getElementById('editor-image-url').value.trim();
       const githubUrl = (document.getElementById('github-url-input').value || '').trim();
       const saveCodeType = (originalAppCodeType === 'react') ? 'react' : currentCodeType;
-      const sourceCode = (saveCodeType === 'react') ? editorDraftReact.trim() : editorDraftHtml.trim();
+      const draft = saveCodeType === 'react' ? editorDraftReact : editorDraftHtml;
       const originalApp = currentEditingAppId ? apps.find(a => a.id === currentEditingAppId) : null;
 
-      if (!originalApp) return Boolean(name || sourceCode || imageUrl || githubUrl);
+      if (!originalApp) return Boolean(name || imageUrl || githubUrl || draft.trim());
 
       return (
         name !== (originalApp.name || '') ||
         imageUrl !== (originalApp.imageUrl || '') ||
         githubUrl !== (originalApp.githubUrl || '') ||
         saveCodeType !== (originalApp.codeType || 'html') ||
-        sourceCode !== ((originalApp.sourceCode || '').trim())
+        draft.trim() !== (originalApp.sourceCode || '').trim()
       );
     }
 
@@ -1640,11 +1676,7 @@ ${getGeneratedLucideRuntime()}
 
           // 復元時はGitHub連携を一旦解除する（ユーザーが手動でいじれるように）
           currentGithubUrl = '';
-          const ghInput = document.getElementById('github-url-input');
-          ghInput.value = '';
-          ghInput.readOnly = false;
-          ghInput.classList.remove('bg-slate-100', 'text-slate-500');
-          document.getElementById('btn-fetch-github').innerHTML = '<i data-lucide="download-cloud" class="w-4 h-4"></i>取得';
+          updateGithubEditorUI();
           setCodeTypeUI(originalAppCodeType);
         };
         list.appendChild(li);
@@ -1691,6 +1723,31 @@ ${getGeneratedLucideRuntime()}
       htmlInput.focus();
     };
 
+    const unlinkGithubButton = document.getElementById('btn-unlink-github');
+
+    function updateGithubEditorUI() {
+      const linked = Boolean(currentGithubUrl);
+      const input = document.getElementById('github-url-input');
+      const fetchButton = document.getElementById('btn-fetch-github');
+      input.value = currentGithubUrl;
+      input.readOnly = linked;
+      input.classList.toggle('bg-slate-100', linked);
+      input.classList.toggle('text-slate-500', linked);
+      fetchButton.innerHTML = linked
+        ? '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新'
+        : '<i data-lucide="download-cloud" class="w-4 h-4"></i>取得';
+      unlinkGithubButton.classList.toggle('hidden', !linked);
+      lucide.createIcons({ root: fetchButton.parentElement });
+    }
+
+    unlinkGithubButton.onclick = () => {
+      currentGithubUrl = '';
+      updateGithubEditorUI();
+      setCodeTypeUI(originalAppCodeType === 'react' ? 'react' : currentCodeType);
+      updateSaveButtonsState();
+      htmlInput.focus();
+    };
+
     // GitHubからのコード取得・更新
     document.getElementById('btn-fetch-github').onclick = async () => {
       // 新規取得の場合の処理
@@ -1725,8 +1782,10 @@ ${getGeneratedLucideRuntime()}
 
       const btn = document.getElementById('btn-fetch-github');
       const originalText = btn.innerHTML;
+      const session = editorSession;
       btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
       btn.disabled = true;
+      unlinkGithubButton.disabled = true;
 
       try {
         // キャッシュ回避のためにタイムスタンプを付与
@@ -1740,6 +1799,7 @@ ${getGeneratedLucideRuntime()}
         const response = await fetch(fetchUrl, { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTPエラー: ${response.status}`);
         const text = await response.text();
+        if (session !== editorSession || editorModal.classList.contains('hidden')) return;
 
         // 拡張子からコードのタイプを推測
         const originalUrl = urlInput.value.trim();
@@ -1769,18 +1829,18 @@ ${getGeneratedLucideRuntime()}
           nameInput.value = fileName.charAt(0).toUpperCase() + fileName.slice(1);
         }
 
-        urlInput.readOnly = true;
-        urlInput.classList.add('bg-slate-100', 'text-slate-500');
-        btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i>更新';
+        updateGithubEditorUI();
         updateSaveButtonsState();
 
         showAlert('GitHubから最新のソースコードを取得しました！');
       } catch (err) {
+        if (session !== editorSession || editorModal.classList.contains('hidden')) return;
         console.error(err);
         showAlert('ファイルの取得に失敗しました。\nURLが正しいか、公開リポジトリであるか確認してください。\n\n詳細: ' + err.message);
         btn.innerHTML = originalText;
       } finally {
         btn.disabled = false;
+        unlinkGithubButton.disabled = false;
         lucide.createIcons({ root: btn.parentElement });
       }
     };
@@ -1837,6 +1897,7 @@ ${getGeneratedLucideRuntime()}
             if (saveCodeType === 'react') {
                 runnableHtml = generateReactHTML(sourceCode, name);
             }
+            const html = normalizeGeneratedReactHtml(runnableHtml);
 
             let newApps = [...apps];
 
@@ -1849,11 +1910,11 @@ ${getGeneratedLucideRuntime()}
               }
 
               newApps = newApps.map(a => a.id === currentEditingAppId ? {
-                ...a, name, codeType: saveCodeType, sourceCode, html: normalizeGeneratedReactHtml(runnableHtml), imageUrl: currentImageUrl, history: newHistory, githubUrl: currentGithubUrl
+                ...a, name, codeType: saveCodeType, sourceCode, html, imageUrl: currentImageUrl, history: newHistory, githubUrl: currentGithubUrl
               } : a);
 
             } else {
-              const newApp = { id: generateId(), name, codeType: saveCodeType, sourceCode, html: normalizeGeneratedReactHtml(runnableHtml), imageUrl: currentImageUrl, createdAt: Date.now(), history: [], githubUrl: currentGithubUrl };
+              const newApp = { id: generateId(), name, codeType: saveCodeType, sourceCode, html, imageUrl: currentImageUrl, createdAt: Date.now(), history: [], githubUrl: currentGithubUrl };
               if (saveHistory) {
                 newApp.history = [{ timestamp: Date.now(), name, codeType: saveCodeType, sourceCode, imageUrl: currentImageUrl, comment: historyComment }];
               }
@@ -1865,7 +1926,7 @@ ${getGeneratedLucideRuntime()}
 
             if (currentEditingAppId) {
                 const iframe = document.getElementById(`iframe-${currentEditingAppId}`);
-                if (iframe) iframe.srcdoc = injectStorageShim(currentEditingAppId, normalizeGeneratedReactHtml(runnableHtml));
+                if (iframe) iframe.srcdoc = injectStorageShim(currentEditingAppId, html);
             }
 
             renderGrid();
@@ -1941,7 +2002,44 @@ ${getGeneratedLucideRuntime()}
     };
 
     document.getElementById('btn-save-editor').onclick = async () => saveEditorApp(false);
-    document.getElementById('btn-save-editor-html').onclick = () => {
+    const htmlSaveButton = document.getElementById('btn-save-editor-html');
+    const htmlSaveMenu = document.getElementById('editor-html-save-menu');
+    const repairSaveButton = document.getElementById('btn-repair-save-html');
+
+    function closeHtmlSaveMenu() {
+      if (htmlSaveMenu.classList.contains('hidden')) return;
+      htmlSaveMenu.classList.add('hidden');
+      htmlSaveButton.setAttribute('aria-expanded', 'false');
+    }
+
+    function openHtmlSaveMenu(event) {
+      event.preventDefault();
+      htmlSaveMenu.classList.remove('hidden');
+      htmlSaveButton.setAttribute('aria-expanded', 'true');
+      repairSaveButton.focus();
+    }
+
+    htmlSaveButton.addEventListener('contextmenu', openHtmlSaveMenu);
+    htmlSaveButton.addEventListener('keydown', event => {
+      if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) openHtmlSaveMenu(event);
+    });
+    const htmlSaveActions = document.getElementById('editor-html-save-actions');
+    htmlSaveActions.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !htmlSaveMenu.classList.contains('hidden')) {
+        event.preventDefault();
+        closeHtmlSaveMenu();
+        htmlSaveButton.focus();
+      }
+    });
+    htmlSaveActions.addEventListener('focusout', event => {
+      if (!htmlSaveActions.contains(event.relatedTarget)) closeHtmlSaveMenu();
+    });
+    document.addEventListener('pointerdown', event => {
+      if (!htmlSaveActions.contains(event.target)) closeHtmlSaveMenu();
+    });
+
+    htmlSaveButton.onclick = () => {
+      closeHtmlSaveMenu();
       if (currentCodeType === 'html' && originalAppCodeType !== 'react' && !currentGithubUrl) {
         editorDraftHtml = htmlInput.value;
       } else if (currentCodeType === 'react' && !currentGithubUrl) {
@@ -1976,7 +2074,9 @@ ${getGeneratedLucideRuntime()}
       showAlert('HTMLファイルをダウンロードしました。');
     };
 
-    document.getElementById('btn-repair-save-html').onclick = () => {
+    repairSaveButton.onclick = () => {
+      closeHtmlSaveMenu();
+      htmlSaveButton.focus();
       const source = htmlInput.value;
       if (!source.trim()) {
         showAlert('修復するHTMLコードがありません。');
@@ -1988,7 +2088,7 @@ ${getGeneratedLucideRuntime()}
       if (currentCodeType === 'html') {
         editorDraftHtml = repaired;
       }
-      document.getElementById('btn-save-editor-html').click();
+      htmlSaveButton.click();
     };
 
     document.getElementById('btn-save-editor-with-history').onclick = async () => {
@@ -2245,15 +2345,15 @@ ${getGeneratedLucideRuntime()}
     };
     document.getElementById('btn-export-cancel').onclick = () => closeModal(document.getElementById('export-modal'));
     document.getElementById('btn-export-confirm').onclick = () => {
-      const selectedIds = Array.from(document.querySelectorAll('.export-app-checkbox:checked')).map(cb => cb.value);
-      const selectedApps = apps.filter(app => selectedIds.includes(app.id));
+      const selectedIds = new Set(Array.from(document.querySelectorAll('.export-app-checkbox:checked'), cb => cb.value));
+      const selectedApps = apps.filter(app => selectedIds.has(app.id));
       if (selectedApps.length === 0) {
         showAlert('エクスポートするアプリを1つ以上選択してください。');
         return;
       }
       // 選択したアプリだけを残し、ホーム順・グループ内順・ソート設定も含める。
       const backup = {
-        version: 2, apps: selectedApps, layout: normalizeLayout(layout, selectedApps),
+        version: 2, apps: selectedApps.map(app => ({ ...app, html: getAppHtml(app) })), layout: normalizeLayout(layout, selectedApps),
         sortOption, settings: { tabDisplayMode }
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
@@ -2289,14 +2389,12 @@ ${getGeneratedLucideRuntime()}
       const idMap = new Map();
       [...imported.apps, ...imported.layout.groups].forEach(item => idMap.set(item.id, generateId()));
       const remapEntry = entry => ({ type: entry.type, id: idMap.get(entry.id) });
-      const lookup = entry => entry.type === 'group'
-        ? imported.layout.groups.find(group => group.id === entry.id)
-        : imported.apps.find(app => app.id === entry.id);
+      const byId = indexEntries(imported.apps, imported.layout.groups);
       apps.push(...imported.apps.map(app => ({ ...app, id: idMap.get(app.id) })));
-      layout.home.push(...sortedEntries(imported.layout.home, imported.sortOption, lookup).map(remapEntry));
+      layout.home.push(...sortedEntries(imported.layout.home, imported.sortOption, byId).map(remapEntry));
       layout.groups.push(...imported.layout.groups.map(group => ({
         ...group, id: idMap.get(group.id),
-        appIds: sortedEntries(group.appIds.map(appEntry), imported.sortOption, lookup).map(entry => idMap.get(entry.id))
+        appIds: sortedEntries(group.appIds.map(appEntry), imported.sortOption, byId).map(entry => idMap.get(entry.id))
       })));
       await persistLayout();
       importPendingData = null;

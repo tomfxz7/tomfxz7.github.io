@@ -14,7 +14,7 @@ HTML / React アプリを保存して開く、ブラウザー内のホーム画�
 
 ## ローカル起動とテスト
 
-リポジトリのルートで `python3 -m http.server 8000` を起動し、`/MD6/` を開きます。ビルドは不要です。通常の表示には Tailwind CSS と Lucide の CDN 接続が必要です。
+リポジトリのルートで `python3 -m http.server 8000` を起動し、`/MD6/` を開きます。ビルドは不要です。ホーム画面の Tailwind CSS は同梱しています。アイコンの表示と登録した React アプリの実行には CDN 接続が必要です。
 
 回帰テストには Python の `playwright` と Chromium が必要です。
 
@@ -23,4 +23,10 @@ python3 -m pip install playwright
 python3 -m unittest discover -s MD6/tests -v
 ```
 
-Chromium が PATH にない場合は `CHROMIUM_PATH` を指定してください。テストは実際のページ・ドラッグ操作・IndexedDB・ファイル入出力を使い、CDNの装飾だけをローカルの代替で置き換えるため、CDNへの接続は不要です。
+Chromium が PATH にない場合は `CHROMIUM_PATH` を指定してください。テストは実際のページ・ドラッグ操作・IndexedDB・ファイル入出力を使い、Lucide の CDN をローカルの代替で置き換えるため、CDN への接続は不要です。
+
+`MD6/index.html` の Tailwind クラスを変更したときは、リポジトリのルートで配信用 CSS を再生成してください。
+
+```sh
+npx --yes tailwindcss@3.4.17 --content ./MD6/index.html --minify --output ./MD6/hub.css
+```
