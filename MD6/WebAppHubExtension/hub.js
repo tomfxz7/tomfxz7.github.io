@@ -202,7 +202,7 @@ function renderFolder(members) {
   const entries = members.get(folder.id) || [];
   $('folder-popup-title').textContent = folder.name;
   $('folder-count').textContent = `${entries.length} 件`;
-  $('folder-entries').replaceChildren(addToFolder, ...entries.map(renderTile));
+  $('folder-entries').replaceChildren(...entries.map(renderTile), addToFolder);
 }
 
 function render() {
@@ -215,7 +215,7 @@ function render() {
   // DOM 順も左側のタブからに揃える。
   $('home-tabs').prepend(tabs.find(tab => tab.dataset.view === state.tabOrder) || tabs[0]);
   const { home, members } = visibleTiles();
-  $('entries').replaceChildren(addTile, ...home.map(renderTile));
+  $('entries').replaceChildren(...home.map(renderTile), addTile);
   if (folderPopup.open) renderFolder(members);
 }
 
@@ -230,6 +230,7 @@ async function refresh() {
   $('open-mode').value = state.openMode;
   $('home-view').value = state.homeView;
   $('tab-order').value = state.tabOrder;
+  syncGridSettings(state.gridSettings);
   render();
 }
 
@@ -473,9 +474,39 @@ for (const [id, key] of [['open-mode', 'openMode'], ['home-view', 'homeView'], [
   };
 }
 
+const gridControls = { columns: $('tile-columns'), gap: $('tile-gap') };
+
+function paintGridSettings({ columns, gap }) {
+  document.documentElement.style.setProperty('--tile-columns', columns);
+  document.documentElement.style.setProperty('--tile-gap', `${gap}px`);
+  $('tile-columns-value').value = `${columns} 列`;
+  $('tile-gap-value').value = `${gap} px`;
+}
+
+function syncGridSettings(settings) {
+  for (const [key, input] of Object.entries(gridControls)) input.value = settings[key];
+  paintGridSettings(settings);
+}
+
+function gridFromControls() {
+  return { columns: gridControls.columns.valueAsNumber, gap: gridControls.gap.valueAsNumber };
+}
+
+for (const input of Object.values(gridControls)) {
+  input.oninput = () => paintGridSettings(gridFromControls());
+  input.onchange = async () => {
+    try {
+      await chrome.storage.local.set({ gridSettings: gridFromControls() });
+    } catch {
+      $('settings-status').textContent = 'タイル表示設定を保存できませんでした。';
+      syncGridSettings(state.gridSettings);
+    }
+  };
+}
+
 $('export').onclick = async () => {
-  const { entries, folders, order } = await readState();
-  const backup = { format: 'webapp-hub-speed-dial', version: 2, entries, folders, order };
+  const { entries, folders, order, gridSettings } = await readState();
+  const backup = { format: 'webapp-hub-speed-dial', version: 2, entries, folders, order, gridSettings };
   const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
   const download = element('a');
   download.href = url;
@@ -496,8 +527,8 @@ $('import').onchange = async event => {
     await updateCollection(current => ({
       entries: [...current.entries, ...imported.entries], folders: [...current.folders, ...imported.folders],
       order: [...current.order, ...imported.order]
-    }));
-    $('settings-status').textContent = `${count} 件を追加しました。${skipped ? ` 対応外のリンク ${skipped} 件をスキップしました。` : ''}`;
+    }), imported.gridSettings);
+    $('settings-status').textContent = `${count} 件を追加しました。${skipped ? ` 対応外のリンク ${skipped} 件をスキップしました。` : ''}${imported.gridSettings ? ' タイル表示設定も復元しました。' : ''}`;
   } catch (error) {
     $('settings-status').textContent = error.message || 'バックアップを読み込めませんでした。';
   }

@@ -101,6 +101,12 @@
         <option value="sites">Web サイト</option>
       </select>
     </label>
+    <h3>タイルの表示</h3>
+    <label for="tile-columns">最大列数 <output id="tile-columns-value" for="tile-columns">8 列</output></label>
+    <input id="tile-columns" type="range" min="1" max="12" value="8">
+    <label for="tile-gap">タイルの間隔 <output id="tile-gap-value" for="tile-gap">16 px</output></label>
+    <input id="tile-gap" type="range" min="0" max="32" value="16">
+    <p class="hint">画面が狭いときは、枠に収まる列数に調整されます。</p>
     <h3>Chrome の起動時に表示</h3>
     <p>Chrome の設定 → 起動時 → 「新しいタブページを開く」を選びます。特定のページとして設定する場合は、下のアドレスを貼り付けます。</p>
     <label>起動ページのアドレス<input id="startup-url" readonly></label>

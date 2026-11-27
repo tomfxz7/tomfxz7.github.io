@@ -1,10 +1,20 @@
 export const $ = id => document.getElementById(id);
 
+const defaultGrid = { columns: 8, gap: 16 };
+
+function validGrid(settings) {
+  return Number.isInteger(settings?.columns) && settings.columns >= 1 && settings.columns <= 12 &&
+    Number.isInteger(settings.gap) && settings.gap >= 0 && settings.gap <= 32;
+}
+
 export async function readState() {
   const stored = await chrome.storage.local.get({
-    entries: [], folders: [], order: [], openMode: 'same', homeView: 'all', tabOrder: 'apps'
+    entries: [], folders: [], order: [], openMode: 'same', homeView: 'all', tabOrder: 'apps', gridSettings: defaultGrid
   });
-  return { ...stored, ...normalizeCollection(stored) };
+  return {
+    ...stored, ...normalizeCollection(stored),
+    gridSettings: validGrid(stored.gridSettings) ? stored.gridSettings : defaultGrid
+  };
 }
 
 export function normalizeCollection({ entries, folders = [], order = [] }) {
@@ -35,10 +45,12 @@ export function normalizeCollection({ entries, folders = [], order = [] }) {
   };
 }
 
-export function updateCollection(update) {
+export function updateCollection(update, gridSettings) {
   return navigator.locks.request('hub-entries', async () => {
     const state = await readState();
-    await chrome.storage.local.set(normalizeCollection(update(state)));
+    const changes = normalizeCollection(update(state));
+    if (validGrid(gridSettings)) changes.gridSettings = gridSettings;
+    await chrome.storage.local.set(changes);
   });
 }
 
@@ -127,7 +139,12 @@ export function parseBackup(data) {
     });
     const order = Array.isArray(data.order) ? data.order.map(id => idMap.get(id)).filter(Boolean) : [];
     const normalized = normalizeCollection({ entries, folders, order });
-    if (data.version !== 1) return normalized;
+    if (data.version === 2) {
+      if (data.gridSettings === undefined) return normalized;
+      if (!validGrid(data.gridSettings)) throw new Error('バックアップのタイル表示設定が不正です。');
+      const { columns, gap } = data.gridSettings;
+      return { ...normalized, gridSettings: { columns, gap } };
+    }
     // 旧形式のフォルダー識別子も、既存のコレクションと衝突しないよう振り直す。
     const folderIds = new Map(normalized.folders.map(folder => [folder.id, crypto.randomUUID()]));
     return {
