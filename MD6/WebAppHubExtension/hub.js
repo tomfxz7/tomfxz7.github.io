@@ -7,8 +7,12 @@ let editingId;
 let editingFolderId;
 let dragging;
 let dropHint;
+let stagedImage;
+let imagePreviewUrl;
 const editor = $('editor');
 const folderEditor = $('folder-editor');
+const folderPopup = $('folder-popup');
+const addToFolder = $('add-to-folder');
 const preferences = $('preferences');
 const addTile = $('add');
 const tabs = [...$('home-tabs').querySelectorAll('button')];
@@ -42,6 +46,10 @@ function marker(entry) {
     image.alt = '';
     image.decoding = 'async';
     image.loading = 'lazy';
+    image.addEventListener('load', () => {
+      mark.replaceChildren(image);
+      mark.classList.add('has-image');
+    }, { once: true });
     image.addEventListener('error', () => image.remove(), { once: true });
     image.src = source;
     mark.append(image);
@@ -54,25 +62,25 @@ function visibleTiles() {
   const folders = new Map(state.folders.map(folder => [folder.id, folder]));
   const members = new Map();
   const occupied = new Set(state.entries.map(entry => entry.folderId));
-  const visible = [];
+  const root = new Map();
   for (const id of state.order) {
     const entry = entries.get(id);
     if (!entry || (activeView !== 'all' && (entry.kind === 'site') !== (activeView === 'sites'))) continue;
     if (entry.folderId) {
       if (!members.has(entry.folderId)) members.set(entry.folderId, []);
       members.get(entry.folderId).push(entry);
+    } else {
+      root.set(id, entry);
     }
-    if (entry.folderId === activeFolder) visible.push(entry);
   }
-  if (activeFolder) return visible;
-  const candidates = new Map(visible.map(entry => [entry.id, entry]));
-  return state.order.map(id => {
-    if (candidates.has(id)) return candidates.get(id);
+  const home = state.order.map(id => {
+    if (root.has(id)) return root.get(id);
     const folder = folders.get(id);
     if (!folder) return null;
     const children = members.get(id) || [];
     return children.length || !occupied.has(id) ? { ...folder, children } : null;
   }).filter(Boolean);
+  return { home, members };
 }
 
 function clearDropHint() {
@@ -145,12 +153,18 @@ function reorder(source, target, after) {
 function renderTile(item, index, items) {
   const tile = element('article', '', 'tile');
   tile.dataset.id = item.id;
+  tile.classList.toggle('site-tile', item.kind === 'site');
   const folder = Boolean(item.children);
   const launch = element(folder ? 'button' : 'a', '', 'launch');
   launch.draggable = false;
   if (folder) {
     launch.type = 'button';
-    launch.onclick = () => { activeFolder = item.id; render(); };
+    launch.setAttribute('aria-haspopup', 'dialog');
+    launch.onclick = () => {
+      activeFolder = item.id;
+      renderFolder(visibleTiles().members);
+      folderPopup.showModal();
+    };
     const preview = element('span', '', 'folder-mark');
     preview.setAttribute('aria-hidden', 'true');
     preview.append(...item.children.slice(0, 4).map(marker));
@@ -163,7 +177,9 @@ function renderTile(item, index, items) {
       launch.rel = 'noopener noreferrer';
     }
     const subtitle = item.kind === 'site' ? new URL(launch.href).hostname : labels[item.kind];
-    launch.append(marker(item), element('strong', item.name), element('small', subtitle));
+    const caption = element('span', '', 'tile-caption');
+    caption.append(element('strong', item.name), element('small', subtitle));
+    launch.append(marker(item), caption);
   }
   const actions = element('div', '', 'tile-actions');
   const previous = button('←', `${item.name} を前へ`, () => reorder(item.id, items[index - 1], false));
@@ -177,12 +193,19 @@ function renderTile(item, index, items) {
   return tile;
 }
 
-function render() {
+function renderFolder(members) {
   const folder = state.folders.find(item => item.id === activeFolder);
-  if (!folder) activeFolder = undefined;
-  $('back-home').hidden = !folder;
-  $('add-folder').hidden = Boolean(folder);
-  $('view-title').textContent = folder?.name || 'スピードダイヤル';
+  if (!folder) {
+    if (folderPopup.open) folderPopup.close();
+    return;
+  }
+  const entries = members.get(folder.id) || [];
+  $('folder-popup-title').textContent = folder.name;
+  $('folder-count').textContent = `${entries.length} 件`;
+  $('folder-entries').replaceChildren(addToFolder, ...entries.map(renderTile));
+}
+
+function render() {
   const split = state.homeView !== 'all';
   $('home-tabs').hidden = !split;
   $('tab-order-field').hidden = !split;
@@ -191,15 +214,16 @@ function render() {
   }
   // DOM 順も左側のタブからに揃える。
   $('home-tabs').prepend(tabs.find(tab => tab.dataset.view === state.tabOrder) || tabs[0]);
-  const items = visibleTiles();
-  $('entries').replaceChildren(addTile, ...items.map(renderTile));
+  const { home, members } = visibleTiles();
+  $('entries').replaceChildren(addTile, ...home.map(renderTile));
+  if (folderPopup.open) renderFolder(members);
 }
 
 async function refresh() {
   const next = await readState();
   if (next.homeView !== state?.homeView) {
     activeView = next.homeView;
-    activeFolder = undefined;
+    if (folderPopup.open) folderPopup.close();
   }
   state = next;
   $('status').textContent = '';
@@ -212,11 +236,20 @@ async function refresh() {
 for (const tab of tabs) {
   tab.onclick = () => {
     activeView = tab.dataset.view;
-    activeFolder = undefined;
     render();
   };
 }
-$('back-home').onclick = () => { activeFolder = undefined; render(); };
+$('close-folder-popup').onclick = () => folderPopup.close();
+folderPopup.addEventListener('click', event => {
+  if (event.target === folderPopup) folderPopup.close();
+});
+folderPopup.addEventListener('close', () => {
+  if (folderPopup.open) return;
+  const folderId = activeFolder;
+  activeFolder = undefined;
+  const tiles = [...$('entries').querySelectorAll('.tile')];
+  tiles.find(tile => tile.dataset.id === folderId)?.querySelector('.launch').focus();
+});
 
 function syncFields() {
   const site = $('kind').value === 'site';
@@ -233,10 +266,12 @@ function openEditor(entry) {
   $('name').value = entry?.name || '';
   $('url').value = entry?.url || '';
   $('source').value = entry?.source || '';
+  stagedImage = undefined;
   $('image-url').value = entry?.imageUrl || '';
+  updateImagePreview();
   const folders = $('entry-folder');
   folders.replaceChildren(new Option('ホーム', ''), ...state.folders.map(folder => new Option(folder.name, folder.id)));
-  folders.value = entry?.folderId || activeFolder || '';
+  folders.value = entry?.folderId || (folderPopup.open ? activeFolder : '') || '';
   $('delete').hidden = !entry;
   $('editor-error').textContent = '';
   syncFields();
@@ -252,7 +287,8 @@ function openFolderEditor(folder) {
   folderEditor.showModal();
 }
 
-$('add').onclick = () => openEditor();
+addTile.onclick = () => openEditor();
+addToFolder.onclick = () => openEditor();
 $('cancel-edit').onclick = () => editor.close();
 $('kind').onchange = syncFields;
 $('add-folder').onclick = () => openFolderEditor();
@@ -305,6 +341,60 @@ $('file').onchange = async event => {
   }
 };
 
+function releasePreviewUrl() {
+  if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+  imagePreviewUrl = undefined;
+}
+
+function updateImagePreview() {
+  releasePreviewUrl();
+  const preview = $('image-preview');
+  if (stagedImage) imagePreviewUrl = URL.createObjectURL(stagedImage);
+  const source = imagePreviewUrl || imageSource($('image-url').value);
+  if (source) preview.src = source;
+  else preview.removeAttribute('src');
+  $('image-preview-row').hidden = !source;
+}
+
+function stageImage(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    $('editor-error').textContent = '画像ファイルを選択してください。';
+    return;
+  }
+  stagedImage = file;
+  $('image-url').value = '';
+  $('editor-error').textContent = '';
+  updateImagePreview();
+}
+
+$('image-file').onchange = event => stageImage(event.target.files[0]);
+$('image-url').oninput = () => {
+  stagedImage = undefined;
+  $('image-file').value = '';
+  updateImagePreview();
+};
+$('clear-image').onclick = () => {
+  $('image-url').value = '';
+  $('image-url').oninput();
+};
+editor.addEventListener('paste', event => {
+  const clipboard = event.clipboardData;
+  const file = [...(clipboard?.files || [])].find(item => item.type.startsWith('image/')) ||
+    [...(clipboard?.items || [])].find(item => item.kind === 'file' && item.type.startsWith('image/'))?.getAsFile();
+  if (!file) return;
+  event.preventDefault();
+  $('image-file').value = '';
+  stageImage(file);
+});
+editor.addEventListener('close', () => {
+  if (editor.open) return;
+  releasePreviewUrl();
+  stagedImage = undefined;
+  $('image-preview').removeAttribute('src');
+  if (folderPopup.open && !folderPopup.contains(document.activeElement)) $('close-folder-popup').focus();
+});
+
 function readImage(file) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) { reject(new Error('画像ファイルを選択してください。')); return; }
@@ -329,7 +419,7 @@ $('entry-form').onsubmit = async event => {
     if (!name) throw new Error('アプリ名を入力してください。');
     const folderId = $('entry-folder').value || undefined;
     const typedImage = $('image-url').value.trim();
-    const file = $('image-file').files[0];
+    const file = stagedImage;
     const imageUrl = file ? await readImage(file) : imageSource(typedImage);
     if (typedImage && !imageUrl) throw new Error('画像の URL を確認してください。');
 
